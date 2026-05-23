@@ -185,3 +185,37 @@ async def api_approved_devices():
             )
             devices = await cur.fetchall()
     return {"success": True, "devices": devices}
+
+
+# =============================================================================
+# ATTENDANCE PROCESSING
+# =============================================================================
+class ProcessAttendanceRequest(BaseModel):
+    date: str  # YYYY-MM-DD
+    end_date: Optional[str] = None  # For range processing
+
+
+@router.post("/attendance/process")
+async def api_process_attendance(req: ProcessAttendanceRequest):
+    """
+    Trigger attendance processing for a specific date or date range.
+    Pairs raw punches into daily records with shift rules applied.
+    """
+    from datetime import date as date_type
+    from workers.attendance_processor import process_date, process_date_range
+
+    try:
+        target_date = date_type.fromisoformat(req.date)
+    except ValueError:
+        raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD.")
+
+    if req.end_date:
+        try:
+            end_date = date_type.fromisoformat(req.end_date)
+        except ValueError:
+            raise HTTPException(400, "Invalid end_date format. Use YYYY-MM-DD.")
+        results = await process_date_range(target_date, end_date)
+        return {"success": True, "results": results}
+    else:
+        result = await process_date(target_date)
+        return {"success": True, "result": result}
