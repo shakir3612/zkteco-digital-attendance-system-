@@ -45,18 +45,23 @@ async def lifespan(app: FastAPI):
     await init_db_pool()
     logger.info("Database connection pool ready")
 
-    # Start background sync worker
+    # Start background workers
     import asyncio
     from workers.sync_worker import start_sync_worker, stop_sync_worker
+    from workers.device_monitor import start_device_monitor, stop_device_monitor
+
     sync_task = asyncio.create_task(start_sync_worker())
-    logger.info("Background sync worker started")
+    monitor_task = asyncio.create_task(start_device_monitor())
+    logger.info("Background workers started (sync + device monitor)")
 
     yield
 
     # SHUTDOWN
     logger.info("Shutting down...")
     await stop_sync_worker()
+    await stop_device_monitor()
     sync_task.cancel()
+    monitor_task.cancel()
     await close_db_pool()
     logger.info("Server stopped")
 
