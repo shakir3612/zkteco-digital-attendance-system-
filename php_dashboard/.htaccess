@@ -5,7 +5,7 @@
 RewriteEngine On
 
 # Set base directory
-RewriteBase /
+RewriteBase /attendance/
 
 # Deny access to config files
 <FilesMatch "\.(ini|log|conf)$">
@@ -23,7 +23,7 @@ RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 # Default: redirect root to index.php
-RewriteRule ^$ /index.php [L]
+RewriteRule ^$ index.php [L]
 
 # PHP settings (if allowed)
 <IfModule mod_php.c>

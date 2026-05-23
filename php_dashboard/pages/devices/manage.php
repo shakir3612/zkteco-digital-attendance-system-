@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sn) {
 
     // Redirect back to detail if action came from there
     if (in_array($action, ['sync_time', 'reboot', 'suspend', 'resync_bio'])) {
-        header("Location: /pages/devices/detail.php?sn=" . urlencode($sn) . "&msg=" . urlencode($message));
+        header("Location: " . BASE_PATH . "/pages/devices/detail.php?sn=" . urlencode($sn) . "&msg=" . urlencode($message));
         exit;
     }
 }
@@ -146,7 +146,7 @@ if (!$device) {
                 <?php if ($device['status'] === 'suspended'): ?>
                     <button type="submit" name="action" value="reactivate" class="btn btn-success">Reactivate</button>
                 <?php endif; ?>
-                <a href="/pages/devices/detail.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Back to Detail</a>
+                <a href="<?= BASE_PATH ?>/pages/devices/detail.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Back to Detail</a>
             </div>
         </form>
     </div>

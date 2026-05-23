@@ -11,6 +11,9 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
+// Base URL path (set to '/attendance' if deployed in a subfolder, or '' for root)
+define('BASE_PATH', '/attendance');
+
 /**
  * Get PDO database connection (singleton pattern).
  */

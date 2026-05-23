@@ -125,7 +125,7 @@ $pendingDevices = $stmt->fetchAll();
     <div class="card">
         <div class="card-header">
             <h3>Pending Approvals</h3>
-            <a href="/pages/devices/pending.php" class="btn btn-sm">View All</a>
+            <a href="<?= BASE_PATH ?>/pages/devices/pending.php" class="btn btn-sm">View All</a>
         </div>
         <div class="card-body">
             <?php if (empty($pendingDevices)): ?>
@@ -139,7 +139,7 @@ $pendingDevices = $stmt->fetchAll();
                             <td><code><?= htmlspecialchars($dev['serial_number']) ?></code></td>
                             <td><?= htmlspecialchars($dev['ip_address']) ?></td>
                             <td><?= date('M j, H:i', strtotime($dev['registered_at'])) ?></td>
-                            <td><a href="/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-xs btn-success">Review</a></td>
+                            <td><a href="<?= BASE_PATH ?>/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-xs btn-success">Review</a></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

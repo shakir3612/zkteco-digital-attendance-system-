@@ -135,14 +135,14 @@ $ackCmds24h = $stmt->fetch()['cnt'];
     <div class="card-header"><h3>Actions</h3></div>
     <div class="card-body">
         <div class="action-buttons">
-            <form method="POST" action="/pages/devices/manage.php" style="display:inline">
+            <form method="POST" action="<?= BASE_PATH ?>/pages/devices/manage.php" style="display:inline">
                 <input type="hidden" name="sn" value="<?= htmlspecialchars($sn) ?>">
                 <button type="submit" name="action" value="sync_time" class="btn btn-primary">Sync Time Now</button>
                 <button type="submit" name="action" value="resync_bio" class="btn btn-outline">Re-sync All Bio</button>
                 <button type="submit" name="action" value="reboot" class="btn btn-outline" onclick="return confirm('Reboot this device?')">Reboot Device</button>
                 <button type="submit" name="action" value="suspend" class="btn btn-danger" onclick="return confirm('Suspend this device?')">Suspend</button>
             </form>
-            <a href="/pages/devices/manage.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Edit Details</a>
+            <a href="<?= BASE_PATH ?>/pages/devices/manage.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Edit Details</a>
         </div>
     </div>
 </div>

@@ -124,7 +124,7 @@ $recentJobs = $stmt->fetchAll();
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Start Import</button>
                 <?php if ($sn): ?>
-                    <a href="/pages/devices/detail.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Back to Device</a>
+                    <a href="<?= BASE_PATH ?>/pages/devices/detail.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Back to Device</a>
                 <?php endif; ?>
             </div>
         </form>

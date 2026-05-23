@@ -47,8 +47,8 @@ $pendingDevices = $stmt->fetchAll();
                         <td><?= date('Y-m-d H:i', strtotime($dev['registered_at'])) ?></td>
                         <td><?= $dev['connection_count'] ?></td>
                         <td>
-                            <a href="/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-sm btn-success">Approve</a>
-                            <a href="/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>&action=reject" class="btn btn-sm btn-danger">Reject</a>
+                            <a href="<?= BASE_PATH ?>/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-sm btn-success">Approve</a>
+                            <a href="<?= BASE_PATH ?>/pages/devices/approve.php?sn=<?= urlencode($dev['serial_number']) ?>&action=reject" class="btn btn-sm btn-danger">Reject</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

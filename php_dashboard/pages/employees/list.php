@@ -55,7 +55,7 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status = 'acti
 <div class="card">
     <div class="card-header">
         <h3>Employees (<?= count($employees) ?>)</h3>
-        <a href="/pages/employees/form.php" class="btn btn-primary">+ Add Employee</a>
+        <a href="<?= BASE_PATH ?>/pages/employees/form.php" class="btn btn-primary">+ Add Employee</a>
     </div>
     <div class="card-body">
         <!-- FILTERS -->
@@ -107,8 +107,8 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status = 'acti
                     <td><?= htmlspecialchars($emp['phone'] ?? '—') ?></td>
                     <td><span class="badge badge-<?= $emp['status'] === 'active' ? 'approved' : 'inactive' ?>"><?= $emp['status'] ?></span></td>
                     <td>
-                        <a href="/pages/employees/form.php?id=<?= $emp['id'] ?>" class="btn btn-xs">Edit</a>
-                        <a href="/pages/employees/sync.php?pin=<?= urlencode($emp['pin']) ?>" class="btn btn-xs btn-outline">Sync</a>
+                        <a href="<?= BASE_PATH ?>/pages/employees/form.php?id=<?= $emp['id'] ?>" class="btn btn-xs">Edit</a>
+                        <a href="<?= BASE_PATH ?>/pages/employees/sync.php?pin=<?= urlencode($emp['pin']) ?>" class="btn btn-xs btn-outline">Sync</a>
                     </td>
                 </tr>
             <?php endforeach; ?>

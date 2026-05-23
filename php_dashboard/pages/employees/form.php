@@ -3,8 +3,10 @@
  * Employee Add/Edit Form
  * On add: pushes SET_USER to all approved devices + auto-assigns default shift.
  */
-$pageTitle = 'Employee';
-require_once __DIR__ . '/../../includes/header.php';
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/auth.php';
+requireLogin();
 
 $db = getDB();
 $id = $_GET['id'] ?? null;
@@ -16,17 +18,12 @@ if ($id) {
     $stmt = $db->prepare("SELECT * FROM employees WHERE id = ?");
     $stmt->execute([$id]);
     $employee = $stmt->fetch();
-    if (!$employee) {
-        echo '<div class="alert alert-error">Employee not found.</div>';
-        require_once __DIR__ . '/../../includes/footer.php';
-        exit;
-    }
-    $pageTitle = 'Edit Employee: ' . $employee['name'];
 }
 
 $departments = $db->query("SELECT id, name FROM departments WHERE status = 'active' ORDER BY name")->fetchAll();
 $shifts = $db->query("SELECT id, name, start_time, end_time FROM shifts WHERE status = 'active'")->fetchAll();
 
+// Handle form submission BEFORE any output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pin = trim($_POST['pin'] ?? '');
     $name = trim($_POST['name'] ?? '');
@@ -51,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("INSERT INTO employee_shifts (employee_id, shift_id, effective_from) VALUES (?, ?, CURDATE()) ON DUPLICATE KEY UPDATE shift_id = VALUES(shift_id)");
                 $stmt->execute([$id, $shiftId]);
 
-                // Push to devices
                 $devices = $db->query("SELECT serial_number FROM devices WHERE status = 'approved'")->fetchAll();
                 if ($status === 'active') {
                     foreach ($devices as $dev) {
@@ -84,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 auditLog('employee_created', 'employee', $newId, "Created PIN={$pin}");
-                header("Location: /pages/employees/form.php?id={$newId}&msg=" . urlencode("Employee added! Synced to " . count($devices) . " device(s)."));
+                header("Location: " . BASE_PATH . "/pages/employees/form.php?id={$newId}&msg=" . urlencode("Employee added! Synced to " . count($devices) . " device(s)."));
                 exit;
             }
         } catch (\PDOException $e) {
@@ -95,6 +91,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (isset($_GET['msg'])) { $message = $_GET['msg']; $messageType = 'success'; }
+
+// Now include header (starts HTML output)
+$pageTitle = $id ? 'Edit Employee: ' . ($employee['name'] ?? '') : 'Add Employee';
+require_once __DIR__ . '/../../includes/header.php';
+
+if ($id && !$employee) {
+    echo '<div class="alert alert-error">Employee not found.</div>';
+    require_once __DIR__ . '/../../includes/footer.php';
+    exit;
+}
 ?>
 
 <?php if ($message): ?>
@@ -175,7 +181,7 @@ if (isset($_GET['msg'])) { $message = $_GET['msg']; $messageType = 'success'; }
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?= $id ? 'Update' : 'Add Employee' ?></button>
-                <a href="/pages/employees/list.php" class="btn btn-outline">Back to List</a>
+                <a href="<?= BASE_PATH ?>/pages/employees/list.php" class="btn btn-outline">Back to List</a>
             </div>
         </form>
     </div>

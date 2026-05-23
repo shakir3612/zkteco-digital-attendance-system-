@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="form-actions">
                 <button type="submit" name="action" value="approve" class="btn btn-success">Approve Device</button>
                 <button type="submit" name="action" value="reject" class="btn btn-danger" onclick="return confirm('Are you sure you want to reject this device?')">Reject Device</button>
-                <a href="/pages/devices/pending.php" class="btn btn-outline">Cancel</a>
+                <a href="<?= BASE_PATH ?>/pages/devices/pending.php" class="btn btn-outline">Cancel</a>
             </div>
         </form>
         <?php endif; ?>

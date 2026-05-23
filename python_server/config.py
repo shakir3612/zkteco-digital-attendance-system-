@@ -1,9 +1,13 @@
 """
 Configuration settings for the ZKTeco Attendance Server.
-All settings can be overridden via environment variables.
+All settings can be overridden via environment variables or .env file.
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load .env file if it exists
+load_dotenv()
 
 
 # =============================================================================

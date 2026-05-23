@@ -3,9 +3,9 @@ Time Sync Cron - Pushes SET_TIME command to all approved devices.
 Runs daily at 3:00 AM (configurable via system_settings.time_sync_hour).
 
 Schedule via Windows Task Scheduler:
-  Program: C:\path\to\venv\Scripts\python.exe
+  Program: C:\\path\\to\\venv\\Scripts\\python.exe
   Arguments: -m workers.time_sync_cron
-  Start in: C:\path\to\python_server
+  Start in: C:\\path\\to\\python_server
   Trigger: Daily at 03:00
 
 Or run standalone: python -m workers.time_sync_cron

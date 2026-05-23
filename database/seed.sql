@@ -10,7 +10,7 @@ USE attendance_system;
 -- Password: admin123 (bcrypt hash - change on first login!)
 -- =============================================================================
 INSERT INTO users (username, password_hash, role, name, status)
-VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'super_admin', 'System Administrator', 'active');
+VALUES ('admin', '$2y$10$7xJw4zNLnBGZ698hEYl8lu5h4LA5kA8ny0Pe5oGidih1HjMgSnGye', 'super_admin', 'System Administrator', 'active');
 
 -- =============================================================================
 -- DEFAULT SHIFT (Regular 9-5)

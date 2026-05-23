@@ -95,6 +95,7 @@ async def sync_template_to_all_devices(pin: str, bio_type: int, bio_no: int,
                     privilege=employee.get("privilege", 0),
                     card=employee.get("card_number", ""),
                 )
+                await mark_user_synced(device_sn, pin)
                 logger.info(f"Queued SET_USER for PIN={pin} to device {device_sn}")
 
         # Queue the biometric data
@@ -106,6 +107,7 @@ async def sync_template_to_all_devices(pin: str, bio_type: int, bio_no: int,
             bio_index=bio_index,
             template=template,
         )
+        await mark_bio_synced(device_sn, pin)
         logger.info(f"Queued SET_BIODATA for PIN={pin} type={bio_type} to device {device_sn}")
 
     logger.info(

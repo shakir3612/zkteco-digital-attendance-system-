@@ -79,7 +79,12 @@ app = FastAPI(
 # CORS middleware (allow PHP dashboard to call internal APIs)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:80",
+        "http://127.0.0.1:80",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -110,7 +115,13 @@ async def root():
 async def health():
     """Detailed health check."""
     from database import _pool
+    pool_status = "disconnected"
+    if _pool is not None:
+        try:
+            pool_status = "connected" if _pool.size > 0 else "empty"
+        except Exception:
+            pool_status = "error"
     return {
         "status": "healthy",
-        "database": "connected" if _pool and not _pool._closed else "disconnected",
+        "database": pool_status,
     }

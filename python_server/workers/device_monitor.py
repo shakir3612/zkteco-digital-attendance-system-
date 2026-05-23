@@ -43,11 +43,36 @@ async def stop_device_monitor():
 async def check_device_status():
     """
     Check all approved devices for offline status.
-    - If last_seen > threshold and no recent offline notification: create one.
-    - If device was offline and now back online: create online notification.
+    Also cleans up stale commands that were delivered but never acknowledged.
     """
     async with get_db() as conn:
         async with conn.cursor() as cur:
+            # --- STALE COMMAND CLEANUP ---
+            # Commands delivered more than 5 minutes ago but never acknowledged: retry them
+            await cur.execute(
+                """UPDATE device_commands 
+                   SET status = 'pending', attempts = attempts
+                   WHERE status = 'delivered' 
+                   AND delivered_at < NOW() - INTERVAL 5 MINUTE
+                   AND attempts < 3"""
+            )
+            retried = cur.rowcount
+            if retried > 0:
+                logger.info(f"Retried {retried} stale delivered commands")
+
+            # Commands that failed 3+ delivery attempts: mark as failed
+            await cur.execute(
+                """UPDATE device_commands 
+                   SET status = 'failed'
+                   WHERE status = 'delivered' 
+                   AND delivered_at < NOW() - INTERVAL 15 MINUTE
+                   AND attempts >= 3"""
+            )
+            failed = cur.rowcount
+            if failed > 0:
+                logger.warning(f"Marked {failed} commands as failed (max retries exceeded)")
+
+            # --- DEVICE OFFLINE DETECTION ---
             # Get offline threshold from settings
             await cur.execute(
                 "SELECT setting_value FROM system_settings WHERE setting_key = 'offline_threshold_minutes'"

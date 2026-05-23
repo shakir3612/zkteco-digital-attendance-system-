@@ -92,7 +92,7 @@ $inactiveDevices = $stmt->fetchAll();
                         </td>
                         <td><?= $dev['punches_today'] ?></td>
                         <td>
-                            <a href="/pages/devices/detail.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-xs">Detail</a>
+                            <a href="<?= BASE_PATH ?>/pages/devices/detail.php?sn=<?= urlencode($dev['serial_number']) ?>" class="btn btn-xs">Detail</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

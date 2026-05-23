@@ -146,7 +146,13 @@ async def receive_device_data(
     Handles: ATTLOG, BIODATA, USERTAB (OPERLOG also accepted but logged only).
     """
     ip_address = get_client_ip(request)
-    body = (await request.body()).decode("utf-8", errors="ignore")
+    body_bytes = await request.body()
+    
+    # Reject oversized payloads (max 10MB)
+    if len(body_bytes) > 10 * 1024 * 1024:
+        return PlainTextResponse(content="ERROR: PAYLOAD_TOO_LARGE", status_code=413)
+    
+    body = body_bytes.decode("utf-8", errors="ignore")
 
     # Always update heartbeat
     device = await get_device_by_sn(SN)

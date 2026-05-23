@@ -4,7 +4,9 @@
  * Handles login, logout, session validation, and role checking.
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -13,7 +15,7 @@ require_once __DIR__ . '/../config/database.php';
  */
 function requireLogin(): void {
     if (!isLoggedIn()) {
-        header('Location: /index.php');
+        header('Location: ' . BASE_PATH . '/index.php');
         exit;
     }
 }
@@ -58,7 +60,7 @@ function isSuperAdmin(): bool {
 function requireSuperAdmin(): void {
     requireLogin();
     if (!isSuperAdmin()) {
-        header('Location: /pages/dashboard.php?error=access_denied');
+        header('Location: ' . BASE_PATH . '/pages/dashboard.php?error=access_denied');
         exit;
     }
 }

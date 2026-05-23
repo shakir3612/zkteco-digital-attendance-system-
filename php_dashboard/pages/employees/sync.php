@@ -88,6 +88,6 @@ $bioCount = $stmt->fetch()['cnt'];
         </table>
     </div>
 </div>
-<div class="form-actions"><a href="/pages/employees/form.php?id=<?= $employee['id'] ?>" class="btn btn-outline">Edit</a> <a href="/pages/employees/list.php" class="btn btn-outline">Back</a></div>
+<div class="form-actions"><a href="<?= BASE_PATH ?>/pages/employees/form.php?id=<?= $employee['id'] ?>" class="btn btn-outline">Edit</a> <a href="<?= BASE_PATH ?>/pages/employees/list.php" class="btn btn-outline">Back</a></div>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
