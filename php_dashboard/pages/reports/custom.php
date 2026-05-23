@@ -9,7 +9,23 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status='active
 $employees = $db->query("SELECT id, pin, name FROM employees WHERE status='active' ORDER BY name")->fetchAll();
 $report = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Load saved template if requested
+if (isset($_POST['load_template'])) {
+    $tplId = (int)$_POST['load_template'];
+    $stmt = $db->prepare("SELECT * FROM report_templates WHERE id = ?");
+    $stmt->execute([$tplId]);
+    $tpl = $stmt->fetch();
+    if ($tpl) {
+        $filters = json_decode($tpl['filters_json'], true) ?: [];
+        $_POST['from_date'] = $filters['from_date'] ?? date('Y-m-01');
+        $_POST['to_date'] = $filters['to_date'] ?? date('Y-m-d');
+        $_POST['department_id'] = $filters['department_id'] ?? '';
+        $_POST['columns'] = json_decode($tpl['columns_json'], true) ?: [];
+        $_POST['grouping'] = $tpl['grouping'] ?? 'summary';
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && !isset($_POST['load_template'])) {
     $fromDate = $_POST['from_date'] ?? date('Y-m-01');
     $toDate = $_POST['to_date'] ?? date('Y-m-d');
     $deptFilter = $_POST['department_id'] ?? '';
@@ -59,9 +75,62 @@ foreach($cols as $k=>$v): ?><label class="checkbox-label"><input type="checkbox"
 </div></div>
 <div class="form-group"><label>Grouping</label><select name="grouping"><option value="summary">One row per employee (summary)</option><option value="detailed">One row per day (detailed)</option></select></div>
 <button type="submit" class="btn btn-primary">Generate</button>
-</form></div></div>
+<button type="submit" name="export" value="csv" class="btn btn-outline">Export CSV</button>
+</form>
+<!-- SAVED TEMPLATES -->
+<?php
+$savedTemplates = $db->query("SELECT id, name FROM report_templates ORDER BY name")->fetchAll();
+if ($savedTemplates): ?>
+<hr>
+<h4>Saved Templates</h4>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+<?php foreach ($savedTemplates as $tpl): ?>
+<form method="POST" style="display:inline"><input type="hidden" name="load_template" value="<?= $tpl['id'] ?>"><button class="btn btn-xs btn-outline"><?= htmlspecialchars($tpl['name']) ?></button></form>
+<?php endforeach; ?>
+</div>
+<?php endif; ?>
+</div></div>
 
 <?php if ($report): ?>
+<?php
+// Handle CSV export
+if (isset($_POST['export']) && $_POST['export'] === 'csv') {
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="attendance_report_' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    if ($report['type'] === 'summary') {
+        fputcsv($out, ['PIN','Name','Dept','Work Days','Present','Late','Early','Absent','Leave','Hours','Late Min','Early Min']);
+        foreach ($report['rows'] as $r) {
+            fputcsv($out, [$r['pin'],$r['emp_name'],$r['dept_name']??'',$r['work_days'],$r['days_present'],$r['days_late'],$r['days_early'],$r['days_absent'],$r['days_leave'],$r['total_hours'],$r['total_late_min'],$r['total_early_min']]);
+        }
+    } else {
+        fputcsv($out, ['Date','PIN','Name','In','Out','Hours','Status','Late','Early']);
+        foreach ($report['rows'] as $r) {
+            fputcsv($out, [$r['date'],$r['emp_pin'],$r['emp_name'],$r['first_in']??'',$r['last_out']??'',$r['total_hours']??'',$r['status'],$r['was_late']?'Y':'N',$r['left_early']?'Y':'N']);
+        }
+    }
+    fclose($out);
+    exit;
+}
+?>
+<!-- SAVE AS TEMPLATE -->
+<div class="card"><div class="card-body">
+<form method="POST" style="display:flex;gap:10px;align-items:flex-end">
+<?php foreach ($_POST as $k => $v): if (is_array($v)): foreach($v as $av): ?><input type="hidden" name="<?= htmlspecialchars($k) ?>[]" value="<?= htmlspecialchars($av) ?>"><?php endforeach; else: ?><input type="hidden" name="<?= htmlspecialchars($k) ?>" value="<?= htmlspecialchars($v) ?>"><?php endif; endforeach; ?>
+<div class="form-group" style="margin:0;flex:1"><input type="text" name="template_name" placeholder="Template name..." required></div>
+<button type="submit" name="save_template" value="1" class="btn btn-sm btn-outline">Save as Template</button>
+</form></div></div>
+<?php
+// Handle save template
+if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
+    $tplName = trim($_POST['template_name']);
+    $colsJson = json_encode($_POST['columns'] ?? []);
+    $filtersJson = json_encode(['from_date'=>$_POST['from_date']??'','to_date'=>$_POST['to_date']??'','department_id'=>$_POST['department_id']??'']);
+    $grouping = $_POST['grouping'] ?? 'summary';
+    $db->prepare("INSERT INTO report_templates (name, created_by, columns_json, filters_json, grouping, created_at) VALUES (?, ?, ?, ?, ?, NOW())")->execute([$tplName, $_SESSION['user_id'], $colsJson, $filtersJson, $grouping]);
+    echo '<div class="alert alert-success">Template "' . htmlspecialchars($tplName) . '" saved!</div>';
+}
+?>
 <div class="card"><div class="card-header"><h3>Results (<?= count($report['rows']) ?> rows)</h3><button onclick="window.print()" class="btn btn-sm btn-outline">Print</button></div>
 <div class="card-body" style="overflow-x:auto">
 <table class="table table-compact"><thead><tr>

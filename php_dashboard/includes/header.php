@@ -56,8 +56,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                 </li>
                 <?php if (isSuperAdmin()): ?>
                 <li class="nav-section">Admin</li>
-                <li class="<?= strpos($_SERVER['PHP_SELF'], 'settings') !== false ? 'active' : '' ?>">
+                <li class="<?= strpos($_SERVER['PHP_SELF'], 'settings') !== false && $currentPage === 'general' ? 'active' : '' ?>">
                     <a href="/pages/settings/general.php">Settings</a>
+                </li>
+                <li class="<?= $currentPage === 'admins' ? 'active' : '' ?>">
+                    <a href="/pages/settings/admins.php">Admin Accounts</a>
                 </li>
                 <?php endif; ?>
             </ul>
