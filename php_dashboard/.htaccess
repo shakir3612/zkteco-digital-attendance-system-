@@ -1,0 +1,33 @@
+# ZKTeco Attendance Dashboard - Apache Configuration
+# Place in the php_dashboard root directory
+
+# Enable mod_rewrite
+RewriteEngine On
+
+# Set base directory
+RewriteBase /
+
+# Deny access to config files
+<FilesMatch "\.(ini|log|conf)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deny access to includes directory directly
+RewriteRule ^includes/ - [F,L]
+RewriteRule ^config/ - [F,L]
+
+# If file or directory exists, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Default: redirect root to index.php
+RewriteRule ^$ /index.php [L]
+
+# PHP settings (if allowed)
+<IfModule mod_php.c>
+    php_value session.gc_maxlifetime 7200
+    php_value session.cookie_httponly 1
+    php_flag display_errors Off
+</IfModule>
