@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import LOG_LEVEL, LOG_FILE, SERVER_TIMEZONE
 from database import init_db_pool, close_db_pool
 from routes.iclock import router as iclock_router
+from routes.api import router as api_router
 
 # =============================================================================
 # LOGGING SETUP
@@ -44,10 +45,18 @@ async def lifespan(app: FastAPI):
     await init_db_pool()
     logger.info("Database connection pool ready")
 
+    # Start background sync worker
+    import asyncio
+    from workers.sync_worker import start_sync_worker, stop_sync_worker
+    sync_task = asyncio.create_task(start_sync_worker())
+    logger.info("Background sync worker started")
+
     yield
 
     # SHUTDOWN
     logger.info("Shutting down...")
+    await stop_sync_worker()
+    sync_task.cancel()
     await close_db_pool()
     logger.info("Server stopped")
 
@@ -75,6 +84,7 @@ app.add_middleware(
 # REGISTER ROUTES
 # =============================================================================
 app.include_router(iclock_router)
+app.include_router(api_router)
 
 
 # =============================================================================

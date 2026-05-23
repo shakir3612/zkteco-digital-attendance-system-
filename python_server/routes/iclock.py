@@ -193,55 +193,68 @@ async def _handle_biodata(device_sn: str, ip_address: str, body: str, stamp: str
     """
     Process incoming biometric data.
     Format: PIN\tNo\tIndex\tValid\tDuress\tType\tMajorVer\tMinorVer\tFormat\tTmp={base64}
+    Stores template and TRIGGERS SYNC to all other approved devices.
     """
+    from services.biometric import store_biometric_template
+    from services.sync import sync_template_to_all_devices
+
     lines = body.strip().split("\n")
     stored_count = 0
+    synced_templates = []
 
-    from database import get_db
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            parts = line.strip().split("\t")
+            if len(parts) < 10:
+                continue
 
-    async with get_db() as conn:
-        async with conn.cursor() as cur:
-            for line in lines:
-                if not line.strip():
-                    continue
-                try:
-                    parts = line.strip().split("\t")
-                    if len(parts) < 10:
-                        continue
+            pin = parts[0].strip()
+            bio_no = int(parts[1].strip()) if parts[1].strip() else 0
+            bio_index = int(parts[2].strip()) if parts[2].strip() else 0
+            valid = int(parts[3].strip()) if parts[3].strip() else 1
+            duress = int(parts[4].strip()) if parts[4].strip() else 0
+            bio_type = int(parts[5].strip()) if parts[5].strip() else 0
+            major_ver = int(parts[6].strip()) if parts[6].strip() else None
+            minor_ver = int(parts[7].strip()) if parts[7].strip() else None
+            fmt = int(parts[8].strip()) if parts[8].strip() else 0
 
-                    pin = parts[0].strip()
-                    bio_no = int(parts[1].strip()) if parts[1].strip() else 0
-                    bio_index = int(parts[2].strip()) if parts[2].strip() else 0
-                    valid = int(parts[3].strip()) if parts[3].strip() else 1
-                    duress = int(parts[4].strip()) if parts[4].strip() else 0
-                    bio_type = int(parts[5].strip()) if parts[5].strip() else 0
-                    major_ver = int(parts[6].strip()) if parts[6].strip() else None
-                    minor_ver = int(parts[7].strip()) if parts[7].strip() else None
-                    fmt = int(parts[8].strip()) if parts[8].strip() else 0
+            # Template data - may start with "Tmp=" prefix
+            template_data = parts[9].strip()
+            if template_data.startswith("Tmp="):
+                template_data = template_data[4:]
 
-                    # Template data - may start with "Tmp=" prefix
-                    template_data = parts[9].strip()
-                    if template_data.startswith("Tmp="):
-                        template_data = template_data[4:]
+            # Store in master table
+            await store_biometric_template(
+                pin=pin, bio_type=bio_type, bio_no=bio_no,
+                bio_index=bio_index, valid=valid, duress=duress,
+                major_ver=major_ver, minor_ver=minor_ver, fmt=fmt,
+                template=template_data, source_device_sn=device_sn
+            )
+            stored_count += 1
 
-                    await cur.execute(
-                        """INSERT INTO biometric_templates 
-                           (pin, bio_type, bio_no, bio_index, valid, duress,
-                            major_ver, minor_ver, format, template, source_device_sn,
-                            created_at, updated_at)
-                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                           ON DUPLICATE KEY UPDATE
-                            template = VALUES(template),
-                            valid = VALUES(valid),
-                            source_device_sn = VALUES(source_device_sn),
-                            updated_at = VALUES(updated_at)""",
-                        (pin, bio_type, bio_no, bio_index, valid, duress,
-                         major_ver, minor_ver, fmt, template_data, device_sn,
-                         datetime.now(), datetime.now())
-                    )
-                    stored_count += 1
-                except Exception as e:
-                    logger.error(f"Error parsing BIODATA line: {e}")
+            # Collect for sync
+            synced_templates.append({
+                "pin": pin, "bio_type": bio_type, "bio_no": bio_no,
+                "bio_index": bio_index, "template": template_data,
+            })
+        except Exception as e:
+            logger.error(f"Error parsing BIODATA line: {e}")
+
+    # TRIGGER SYNC: distribute each template to all other approved devices
+    for tpl in synced_templates:
+        try:
+            await sync_template_to_all_devices(
+                pin=tpl["pin"],
+                bio_type=tpl["bio_type"],
+                bio_no=tpl["bio_no"],
+                bio_index=tpl["bio_index"],
+                template=tpl["template"],
+                source_device_sn=device_sn,
+            )
+        except Exception as e:
+            logger.error(f"Error triggering sync for PIN={tpl['pin']}: {e}")
 
     # Update stamp
     if stamp:
@@ -249,9 +262,9 @@ async def _handle_biodata(device_sn: str, ip_address: str, body: str, stamp: str
         await update_device_stamp(device_sn, "BIODATA", new_stamp)
 
     await log_connection(device_sn, ip_address, "push_bio", True,
-                        f"Stored {stored_count} biometric templates")
+                        f"Stored {stored_count} templates, sync triggered")
 
-    logger.info(f"BIODATA from {device_sn}: {stored_count} templates stored")
+    logger.info(f"BIODATA from {device_sn}: {stored_count} templates stored + sync triggered")
     return PlainTextResponse(content="OK")
 
 
@@ -259,49 +272,70 @@ async def _handle_usertab(device_sn: str, ip_address: str, body: str, stamp: str
     """
     Process incoming user info from device.
     Format: PIN\tName\tPri\tPasswd\tCard\tGrp\tTZ\tVerify
+    If triggered by an import job, applies conflict_mode rules.
     """
+    from services.importer import (
+        get_active_import_job, start_import_job,
+        update_import_progress, complete_import_job, process_imported_user
+    )
+
     lines = body.strip().split("\n")
-    stored_count = 0
+    valid_lines = [l for l in lines if l.strip()]
 
-    from database import get_db
+    # Check if there's an active import job for this device
+    import_job = await get_active_import_job(device_sn, 'users')
+    conflict_mode = 'skip'  # default
+    if import_job:
+        conflict_mode = import_job.get('conflict_mode', 'skip')
+        if import_job['status'] == 'queued':
+            await start_import_job(import_job['id'])
 
-    async with get_db() as conn:
-        async with conn.cursor() as cur:
-            for line in lines:
-                if not line.strip():
-                    continue
-                try:
-                    parts = line.strip().split("\t")
-                    if len(parts) < 2:
-                        continue
+    inserted = 0
+    updated = 0
+    skipped = 0
+    failed = 0
 
-                    pin = parts[0].strip()
-                    name = parts[1].strip() if len(parts) > 1 else ""
-                    privilege = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip() else 0
-                    # passwd = parts[3] if len(parts) > 3 else ""  # Not stored
-                    card = parts[4].strip() if len(parts) > 4 else None
-                    # grp = parts[5] if len(parts) > 5 else ""
-                    # tz = parts[6] if len(parts) > 6 else ""
+    for line in valid_lines:
+        try:
+            parts = line.strip().split("\t")
+            if len(parts) < 2:
+                continue
 
-                    # Insert or update employee
-                    await cur.execute(
-                        """INSERT INTO employees (pin, name, privilege, card_number, status, created_at)
-                           VALUES (%s, %s, %s, %s, 'active', %s)
-                           ON DUPLICATE KEY UPDATE
-                            name = CASE WHEN VALUES(name) != '' THEN VALUES(name) ELSE name END,
-                            privilege = VALUES(privilege),
-                            card_number = COALESCE(VALUES(card_number), card_number),
-                            updated_at = %s""",
-                        (pin, name, privilege, card, datetime.now(), datetime.now())
-                    )
-                    stored_count += 1
-                except Exception as e:
-                    logger.error(f"Error parsing USERTAB line: {e}")
+            pin = parts[0].strip()
+            name = parts[1].strip() if len(parts) > 1 else ""
+            privilege = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip() else 0
+            card = parts[4].strip() if len(parts) > 4 else ""
+
+            result = await process_imported_user(
+                device_sn=device_sn, pin=pin, name=name,
+                privilege=privilege, card=card,
+                conflict_mode=conflict_mode
+            )
+
+            if result == 'inserted':
+                inserted += 1
+            elif result == 'updated':
+                updated += 1
+            else:
+                skipped += 1
+        except Exception as e:
+            logger.error(f"Error parsing USERTAB line: {e}")
+            failed += 1
+
+    # Update import job if one exists
+    if import_job:
+        await update_import_progress(
+            import_job['id'],
+            received=len(valid_lines),
+            inserted=inserted, updated=updated,
+            skipped=skipped, failed=failed
+        )
+        await complete_import_job(import_job['id'], 'completed')
 
     await log_connection(device_sn, ip_address, "push_user", True,
-                        f"Processed {stored_count} user records")
+                        f"Users: {inserted} new, {updated} updated, {skipped} skipped")
 
-    logger.info(f"USERTAB from {device_sn}: {stored_count} users processed")
+    logger.info(f"USERTAB from {device_sn}: {inserted} inserted, {updated} updated, {skipped} skipped")
     return PlainTextResponse(content="OK")
 
 
