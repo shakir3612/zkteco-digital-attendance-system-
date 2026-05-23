@@ -1,0 +1,16 @@
+# ZKTeco Attendance Server - Python Dependencies
+# Install: pip install -r requirements.txt
+
+# Web framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+
+# Async MySQL driver
+aiomysql==0.2.0
+PyMySQL==1.1.1
+
+# CORS and HTTP
+python-multipart==0.0.9
+
+# Utilities
+python-dotenv==1.0.1
