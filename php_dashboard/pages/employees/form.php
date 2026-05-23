@@ -20,14 +20,14 @@ if ($id) {
     $employee = $stmt->fetch();
 }
 
-$departments = $db->query("SELECT id, name FROM departments WHERE status = 'active' ORDER BY name")->fetchAll();
+$departments = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
 $shifts = $db->query("SELECT id, name, start_time, end_time FROM shifts WHERE status = 'active'")->fetchAll();
 
 // Handle form submission BEFORE any output
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pin = trim($_POST['pin'] ?? '');
     $name = trim($_POST['name'] ?? '');
-    $deptId = $_POST['department_id'] ?: null;
+    $deptId = $_POST['grade_id'] ?: null;
     $designation = trim($_POST['designation'] ?? '');
     $card = trim($_POST['card_number'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             if ($id) {
-                $stmt = $db->prepare("UPDATE employees SET name=?, department_id=?, designation=?, card_number=?, phone=?, email=?, join_date=?, status=?, updated_at=NOW() WHERE id=?");
+                $stmt = $db->prepare("UPDATE employees SET name=?, grade_id=?, designation=?, card_number=?, phone=?, email=?, join_date=?, status=?, updated_at=NOW() WHERE id=?");
                 $stmt->execute([$name, $deptId, $designation, $card, $phone, $email, $joinDate, $status, $id]);
 
                 $stmt = $db->prepare("INSERT INTO employee_shifts (employee_id, shift_id, effective_from) VALUES (?, ?, CURDATE()) ON DUPLICATE KEY UPDATE shift_id = VALUES(shift_id)");
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$id]);
                 $employee = $stmt->fetch();
             } else {
-                $stmt = $db->prepare("INSERT INTO employees (pin, name, department_id, designation, card_number, phone, email, join_date, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
+                $stmt = $db->prepare("INSERT INTO employees (pin, name, grade_id, designation, card_number, phone, email, join_date, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())");
                 $stmt->execute([$pin, $name, $deptId, $designation, $card, $phone, $email, $joinDate]);
                 $newId = $db->lastInsertId();
 
@@ -123,11 +123,11 @@ if ($id && !$employee) {
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="department_id">Department</label>
-                    <select id="department_id" name="department_id">
+                    <label for="grade_id">Grade</label>
+                    <select id="grade_id" name="grade_id">
                         <option value="">— None —</option>
                         <?php foreach ($departments as $dept): ?>
-                            <option value="<?= $dept['id'] ?>" <?= ($employee['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>><?= htmlspecialchars($dept['name']) ?></option>
+                            <option value="<?= $dept['id'] ?>" <?= ($employee['grade_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>><?= htmlspecialchars($dept['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

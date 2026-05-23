@@ -3,7 +3,7 @@
  * Admin Account Management - Create/edit/delete admin users.
  * Super admin only.
  */
-$pageTitle = 'Admin Accounts';
+$pageTitle = 'Manage Admins';
 require_once __DIR__ . '/../../includes/header.php';
 requireSuperAdmin();
 
@@ -60,30 +60,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             auditLog('admin_deleted', 'user', $uid, "Deleted");
             $message = "Deleted."; $messageType = 'info';
         } else { $message = "Cannot delete yourself."; $messageType = 'error'; }
-    } elseif ($action === 'change_own_password') {
-        $cur = $_POST['current_password'] ?? '';
-        $new = $_POST['new_password'] ?? '';
-        $conf = $_POST['confirm_password'] ?? '';
-        $stmt = $db->prepare("SELECT password_hash FROM users WHERE id = ?");
-        $stmt->execute([$_SESSION['user_id']]); $u = $stmt->fetch();
-        if (!password_verify($cur, $u['password_hash'])) { $message = "Current password incorrect."; $messageType = 'error'; }
-        elseif (strlen($new) < 6) { $message = "Min 6 chars."; $messageType = 'error'; }
-        elseif ($new !== $conf) { $message = "Passwords don't match."; $messageType = 'error'; }
-        else { $db->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([password_hash($new, PASSWORD_BCRYPT), $_SESSION['user_id']]); auditLog('password_changed', 'user', $_SESSION['user_id'], "Changed own password"); $message = "Password changed."; $messageType = 'success'; }
     }
 }
 
 $admins = $db->query("SELECT * FROM users ORDER BY role DESC, name")->fetchAll();
 ?>
 <?php if ($message): ?><div class="alert alert-<?= $messageType ?>"><?= htmlspecialchars($message) ?></div><?php endif; ?>
-
-<div class="card"><div class="card-header"><h3>Change My Password</h3></div><div class="card-body">
-<form method="POST"><input type="hidden" name="action" value="change_own_password">
-<div class="form-row">
-<div class="form-group"><label>Current Password *</label><input type="password" name="current_password" required></div>
-<div class="form-group"><label>New Password *</label><input type="password" name="new_password" required minlength="6"></div>
-<div class="form-group"><label>Confirm *</label><input type="password" name="confirm_password" required minlength="6"></div>
-</div><button type="submit" class="btn btn-primary">Change Password</button></form></div></div>
 
 <div class="card"><div class="card-header"><h3>Create Admin</h3></div><div class="card-body">
 <form method="POST"><input type="hidden" name="action" value="create">

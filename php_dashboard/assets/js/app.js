@@ -57,7 +57,8 @@
         for (var i = 0; i < selects.length; i++) {
             var sel = selects[i];
             // Only enhance selects with more than 5 options
-            if (sel.options.length > 5 && !sel.classList.contains('no-search')) {
+            // Skip filter-selects (small inline filters) and no-search marked ones
+            if (sel.options.length > 5 && !sel.classList.contains('no-search') && !sel.classList.contains('filter-select')) {
                 createSearchableSelect(sel);
             }
         }

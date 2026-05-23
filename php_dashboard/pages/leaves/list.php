@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $where = ""; $params = [];
 if ($statusFilter && $statusFilter !== 'all') { $where = "WHERE l.status = ?"; $params[] = $statusFilter; }
-$stmt = $db->prepare("SELECT l.*, e.name as emp_name, e.pin as emp_pin, d.name as dept_name FROM leaves l JOIN employees e ON e.id = l.employee_id LEFT JOIN departments d ON d.id = e.department_id {$where} ORDER BY l.applied_at DESC LIMIT 50");
+$stmt = $db->prepare("SELECT l.*, e.name as emp_name, e.pin as emp_pin, g.name as grade_name FROM leaves l JOIN employees e ON e.id = l.employee_id LEFT JOIN grades g ON g.id = e.grade_id {$where} ORDER BY l.applied_at DESC LIMIT 50");
 $stmt->execute($params);
 $leaves = $stmt->fetchAll();
 $employees = $db->query("SELECT id, pin, name FROM employees WHERE status = 'active' ORDER BY name")->fetchAll();

@@ -74,9 +74,9 @@ CREATE TABLE device_connection_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =============================================================================
--- DEPARTMENTS
+-- GRADES (Employee grades/levels)
 -- =============================================================================
-CREATE TABLE departments (
+CREATE TABLE grades (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     parent_id INT,
@@ -90,7 +90,7 @@ CREATE TABLE employees (
     id INT AUTO_INCREMENT PRIMARY KEY,
     pin VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
-    department_id INT,
+    grade_id INT,
     designation VARCHAR(100),
     card_number VARCHAR(50),
     privilege INT DEFAULT 0,
@@ -101,7 +101,7 @@ CREATE TABLE employees (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_status (status),
-    INDEX idx_department (department_id)
+    INDEX idx_grade (grade_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =============================================================================

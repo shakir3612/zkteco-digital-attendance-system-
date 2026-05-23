@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
     $fromDate = $_POST['from_date'] ?? $_GET['from'] ?? date('Y-m-01');
     $toDate = $_POST['to_date'] ?? $_GET['to'] ?? date('Y-m-d');
     if ($pin) {
-        $stmt = $db->prepare("SELECT e.*, d.name as dept_name FROM employees e LEFT JOIN departments d ON d.id = e.department_id WHERE e.pin = ?"); $stmt->execute([$pin]); $employee = $stmt->fetch();
+        $stmt = $db->prepare("SELECT e.*, g.name as grade_name FROM employees e LEFT JOIN grades g ON g.id = e.grade_id WHERE e.pin = ?"); $stmt->execute([$pin]); $employee = $stmt->fetch();
         if ($employee) {
             $stmt = $db->prepare("SELECT s.name, s.start_time, s.end_time FROM employee_shifts es JOIN shifts s ON s.id = es.shift_id WHERE es.employee_id = ? ORDER BY es.effective_from DESC LIMIT 1"); $stmt->execute([$employee['id']]); $shift = $stmt->fetch();
             $stmt = $db->prepare("SELECT * FROM attendance_daily WHERE pin = ? AND date BETWEEN ? AND ? ORDER BY date"); $stmt->execute([$pin, $fromDate, $toDate]); $records = $stmt->fetchAll();
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
 <div style="text-align:center;margin-bottom:20px"><h2><?= htmlspecialchars(getSetting('company_name','Company')) ?></h2><h4 style="color:var(--gray-500)">Employee Attendance Report</h4></div>
 <div class="detail-grid">
 <div class="detail-item"><label>Employee:</label><span><?= htmlspecialchars($employee['name']) ?> (PIN: <?= $employee['pin'] ?>)</span></div>
-<div class="detail-item"><label>Department:</label><span><?= htmlspecialchars($employee['dept_name'] ?? '—') ?></span></div>
+<div class="detail-item"><label>Grade:</label><span><?= htmlspecialchars($employee['grade_name'] ?? '—') ?></span></div>
 <div class="detail-item"><label>Designation:</label><span><?= htmlspecialchars($employee['designation'] ?? '—') ?></span></div>
 <div class="detail-item"><label>Shift:</label><span><?= $report['shift'] ? $report['shift']['name'].' ('.substr($report['shift']['start_time'],0,5).'-'.substr($report['shift']['end_time'],0,5).')' : 'Default 9-5' ?></span></div>
 <div class="detail-item"><label>Period:</label><span><?= date('M j, Y',strtotime($report['from'])) ?> — <?= date('M j, Y',strtotime($report['to'])) ?></span></div>

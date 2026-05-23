@@ -1,21 +1,72 @@
 <?php
 /**
  * Daily Attendance View - shows processed attendance for a selected date.
+ * Includes manual sync button to trigger attendance processing.
  */
-$pageTitle = 'Daily Attendance';
-require_once __DIR__ . '/../../includes/header.php';
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/auth.php';
+requireLogin();
 
 $db = getDB();
 $selectedDate = $_GET['date'] ?? date('Y-m-d');
-$deptFilter = $_GET['department'] ?? '';
+$deptFilter = $_GET['grade'] ?? '';
 $statusFilter = $_GET['att_status'] ?? '';
+$syncMessage = '';
+$syncMessageType = '';
+
+// Handle manual sync request
+if (isset($_POST['action']) && $_POST['action'] === 'process_attendance') {
+    $processDate = $_POST['process_date'] ?? $selectedDate;
+    $processEndDate = $_POST['process_end_date'] ?? '';
+
+    $apiUrl = 'http://127.0.0.1:8015/api/attendance/process';
+    $payload = ['date' => $processDate];
+    if (!empty($processEndDate) && $processEndDate >= $processDate) {
+        $payload['end_date'] = $processEndDate;
+    }
+
+    $ch = curl_init($apiUrl);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError) {
+        $syncMessage = "Failed to connect to attendance server: {$curlError}";
+        $syncMessageType = 'error';
+    } elseif ($httpCode === 200) {
+        $result = json_decode($response, true);
+        if (!empty($result['result'])) {
+            $r = $result['result'];
+            $syncMessage = "Processed {$r['date']}: {$r['present']} present, {$r['absent']} absent, {$r['late']} late.";
+        } elseif (!empty($result['results'])) {
+            $syncMessage = "Processed " . count($result['results']) . " day(s) successfully.";
+        } else {
+            $syncMessage = "Attendance processed successfully.";
+        }
+        $syncMessageType = 'success';
+        auditLog('attendance_processed', null, null, "Manual sync for {$processDate}");
+    } else {
+        $syncMessage = "Server returned error (HTTP {$httpCode}). Make sure the Python server is running.";
+        $syncMessageType = 'error';
+    }
+}
+
+$pageTitle = 'Daily Attendance';
+require_once __DIR__ . '/../../includes/header.php';
 
 // Build query
 $where = ["ad.date = ?"];
 $params = [$selectedDate];
 
 if ($deptFilter) {
-    $where[] = "e.department_id = ?";
+    $where[] = "e.grade_id = ?";
     $params[] = $deptFilter;
 }
 if ($statusFilter) {
@@ -34,10 +85,10 @@ if ($statusFilter) {
 $whereClause = implode(' AND ', $where);
 
 $stmt = $db->prepare("
-    SELECT ad.*, e.name as emp_name, d.name as dept_name, s.name as shift_name
+    SELECT ad.*, e.name as emp_name, g.name as grade_name, s.name as shift_name
     FROM attendance_daily ad
     JOIN employees e ON e.pin = ad.pin
-    LEFT JOIN departments d ON d.id = e.department_id
+    LEFT JOIN grades g ON g.id = e.grade_id
     LEFT JOIN shifts s ON s.id = ad.shift_id
     WHERE {$whereClause}
     ORDER BY e.name ASC
@@ -55,7 +106,7 @@ foreach ($records as $r) {
     elseif ($r['status'] === 'weekend') $summary['weekend']++;
 }
 
-$departments = $db->query("SELECT id, name FROM departments WHERE status = 'active' ORDER BY name")->fetchAll();
+$departments = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
 
 // Check if processing has been done
 $stmt2 = $db->prepare("SELECT COUNT(*) as cnt FROM attendance_daily WHERE date = ?");
@@ -68,8 +119,8 @@ $processedCount = $stmt2->fetch()['cnt'];
     <div class="card-body">
         <form method="GET" class="filter-bar">
             <input type="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" class="filter-input">
-            <select name="department" class="filter-select">
-                <option value="">All Departments</option>
+            <select name="grade" class="filter-select">
+                <option value="">All Grades</option>
                 <?php foreach ($departments as $dept): ?>
                     <option value="<?= $dept['id'] ?>" <?= $deptFilter == $dept['id'] ? 'selected' : '' ?>><?= htmlspecialchars($dept['name']) ?></option>
                 <?php endforeach; ?>
@@ -87,6 +138,34 @@ $processedCount = $stmt2->fetch()['cnt'];
             <a href="?date=<?= date('Y-m-d', strtotime($selectedDate . ' -1 day')) ?>" class="btn btn-outline btn-sm">&larr; Prev</a>
             <a href="?date=<?= date('Y-m-d', strtotime($selectedDate . ' +1 day')) ?>" class="btn btn-outline btn-sm">Next &rarr;</a>
             <a href="?date=<?= date('Y-m-d') ?>" class="btn btn-outline btn-sm">Today</a>
+        </form>
+    </div>
+</div>
+
+<?php if ($syncMessage): ?>
+    <div class="alert alert-<?= $syncMessageType ?>"><?= htmlspecialchars($syncMessage) ?></div>
+<?php endif; ?>
+
+<!-- MANUAL SYNC / PROCESS ATTENDANCE -->
+<div class="card">
+    <div class="card-header">
+        <h3>Process Attendance</h3>
+        <small class="text-muted">Convert raw punches into daily records</small>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="filter-bar">
+            <input type="hidden" name="action" value="process_attendance">
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">From Date</label>
+                <input type="date" name="process_date" value="<?= htmlspecialchars($selectedDate) ?>" class="filter-input">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">To Date <small>(optional)</small></label>
+                <input type="date" name="process_end_date" value="" class="filter-input">
+            </div>
+            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Process attendance for the selected date(s)?')">
+                &#8635; Process Now
+            </button>
         </form>
     </div>
 </div>
@@ -117,7 +196,7 @@ $processedCount = $stmt2->fetch()['cnt'];
                 <tr>
                     <th>PIN</th>
                     <th>Name</th>
-                    <th>Dept</th>
+                    <th>Grade</th>
                     <th>Shift</th>
                     <th>In</th>
                     <th>Out</th>
@@ -134,7 +213,7 @@ $processedCount = $stmt2->fetch()['cnt'];
                 <tr>
                     <td><code><?= htmlspecialchars($r['pin']) ?></code></td>
                     <td><?= htmlspecialchars($r['emp_name']) ?></td>
-                    <td><?= htmlspecialchars($r['dept_name'] ?? '—') ?></td>
+                    <td><?= htmlspecialchars($r['grade_name'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($r['shift_name'] ?? '—') ?></td>
                     <td><?= $r['first_in'] ? date('H:i', strtotime($r['first_in'])) : '—' ?></td>
                     <td><?= $r['last_out'] ? date('H:i', strtotime($r['last_out'])) : ($r['single_punch'] ? '<span class="text-muted">single</span>' : '—') ?></td>

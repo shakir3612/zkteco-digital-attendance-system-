@@ -52,10 +52,7 @@ $companyName = getSetting('company_name', 'Attendance System');
         <div class="login-card">
             <div class="login-brand">
                 <div class="brand-icon">
-                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                        <rect width="48" height="48" rx="12" fill="#2563eb"/>
-                        <path d="M14 24l6 6 14-14" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+                    <img src="<?= BASE_PATH ?>/assets/logo.png" alt="Logo" class="login-logo">
                 </div>
                 <h1 class="brand-name"><?= htmlspecialchars($companyName) ?></h1>
                 <p class="login-subtitle">Attendance Management System</p>

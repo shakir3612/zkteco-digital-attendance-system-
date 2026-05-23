@@ -7,10 +7,11 @@ USE attendance_system;
 
 -- =============================================================================
 -- DEFAULT SUPER ADMIN
--- Password: admin123 (bcrypt hash - change on first login!)
+-- The admin password is set automatically on first login page load.
+-- Default credentials: admin / admin123
 -- =============================================================================
 INSERT INTO users (username, password_hash, role, name, status)
-VALUES ('admin', '$2y$10$7xJw4zNLnBGZ698hEYl8lu5h4LA5kA8ny0Pe5oGidih1HjMgSnGye', 'super_admin', 'System Administrator', 'active');
+VALUES ('admin', '__PENDING__', 'super_admin', 'System Administrator', 'active');
 
 -- =============================================================================
 -- DEFAULT SHIFT (Regular 9-5)
@@ -33,6 +34,6 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('auto_refresh_seconds', '30', 'Dashboard auto-refresh interval in seconds');
 
 -- =============================================================================
--- DEFAULT DEPARTMENT
+-- DEFAULT GRADE
 -- =============================================================================
-INSERT INTO departments (name, status) VALUES ('Default', 'active');
+INSERT INTO grades (name, status) VALUES ('Default Grade', 'active');

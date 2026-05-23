@@ -1,6 +1,6 @@
 <?php
 /**
- * Employees List - Search, filter by department/status
+ * Employees List - Search, filter by grade/status
  */
 $pageTitle = 'Employees';
 require_once __DIR__ . '/../../includes/header.php';
@@ -9,7 +9,7 @@ $db = getDB();
 
 // Filters
 $search = trim($_GET['search'] ?? '');
-$deptFilter = $_GET['department'] ?? '';
+$gradeFilter = $_GET['grade'] ?? '';
 $statusFilter = $_GET['status'] ?? 'active';
 
 // Build query
@@ -22,9 +22,9 @@ if ($search) {
     $params[] = "%{$search}%";
     $params[] = "%{$search}%";
 }
-if ($deptFilter) {
-    $where[] = "e.department_id = ?";
-    $params[] = $deptFilter;
+if ($gradeFilter) {
+    $where[] = "e.grade_id = ?";
+    $params[] = $gradeFilter;
 }
 if ($statusFilter && $statusFilter !== 'all') {
     $where[] = "e.status = ?";
@@ -34,10 +34,10 @@ if ($statusFilter && $statusFilter !== 'all') {
 $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $stmt = $db->prepare("
-    SELECT e.*, d.name as department_name,
+    SELECT e.*, g.name as grade_name,
            s.name as shift_name
     FROM employees e
-    LEFT JOIN departments d ON d.id = e.department_id
+    LEFT JOIN grades g ON g.id = e.grade_id
     LEFT JOIN employee_shifts es ON es.employee_id = e.id 
         AND es.effective_from <= CURDATE() 
         AND (es.effective_to IS NULL OR es.effective_to >= CURDATE())
@@ -48,8 +48,8 @@ $stmt = $db->prepare("
 $stmt->execute($params);
 $employees = $stmt->fetchAll();
 
-// Get departments for filter
-$departments = $db->query("SELECT id, name FROM departments WHERE status = 'active' ORDER BY name")->fetchAll();
+// Get grades for filter
+$grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
 ?>
 
 <div class="card">
@@ -62,11 +62,11 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status = 'acti
         <form method="GET" class="filter-bar">
             <input type="text" name="search" placeholder="Search PIN, name, phone..." 
                    value="<?= htmlspecialchars($search) ?>" class="filter-input">
-            <select name="department" class="filter-select">
-                <option value="">All Departments</option>
-                <?php foreach ($departments as $dept): ?>
-                    <option value="<?= $dept['id'] ?>" <?= $deptFilter == $dept['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($dept['name']) ?>
+            <select name="grade" class="filter-select">
+                <option value="">All Grades</option>
+                <?php foreach ($grades as $g): ?>
+                    <option value="<?= $g['id'] ?>" <?= $gradeFilter == $g['id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($g['name']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -85,7 +85,7 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status = 'acti
                 <tr>
                     <th>PIN</th>
                     <th>Name</th>
-                    <th>Department</th>
+                    <th>Grade</th>
                     <th>Designation</th>
                     <th>Shift</th>
                     <th>Phone</th>
@@ -101,7 +101,7 @@ $departments = $db->query("SELECT id, name FROM departments WHERE status = 'acti
                 <tr>
                     <td><code><?= htmlspecialchars($emp['pin']) ?></code></td>
                     <td><strong><?= htmlspecialchars($emp['name']) ?></strong></td>
-                    <td><?= htmlspecialchars($emp['department_name'] ?? '—') ?></td>
+                    <td><?= htmlspecialchars($emp['grade_name'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($emp['designation'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($emp['shift_name'] ?? 'Default 9-5') ?></td>
                     <td><?= htmlspecialchars($emp['phone'] ?? '—') ?></td>

@@ -23,10 +23,7 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
             <div class="sidebar-header">
                 <div class="sidebar-brand">
                     <div class="sidebar-brand-icon">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                            <rect width="32" height="32" rx="8" fill="rgba(37,99,235,.15)"/>
-                            <path d="M10 16l4 4 8-8" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
+                        <img src="<?= BASE_PATH ?>/assets/logo.png" alt="Logo" class="sidebar-logo">
                     </div>
                     <div class="sidebar-brand-text">
                         <h2><?= htmlspecialchars($companyName) ?></h2>
@@ -46,11 +43,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                     <a href="<?= BASE_PATH ?>/pages/devices/pending.php">Pending Approval</a>
                 </li>
                 <li class="nav-section">Employees</li>
-                <li class="<?= strpos($_SERVER['PHP_SELF'], 'employees') !== false && $currentPage !== 'departments' ? 'active' : '' ?>">
+                <li class="<?= strpos($_SERVER['PHP_SELF'], 'employees') !== false && $currentPage !== 'grades' ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/employees/list.php">Employees</a>
                 </li>
-                <li class="<?= $currentPage === 'departments' ? 'active' : '' ?>">
-                    <a href="<?= BASE_PATH ?>/pages/employees/departments.php">Departments</a>
+                <li class="<?= $currentPage === 'grades' ? 'active' : '' ?>">
+                    <a href="<?= BASE_PATH ?>/pages/employees/grades.php">Grades</a>
                 </li>
                 <li class="nav-section">Attendance</li>
                 <li class="<?= strpos($_SERVER['PHP_SELF'], 'attendance') !== false ? 'active' : '' ?>">
@@ -75,9 +72,13 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                     <a href="<?= BASE_PATH ?>/pages/settings/general.php">Settings</a>
                 </li>
                 <li class="<?= $currentPage === 'admins' ? 'active' : '' ?>">
-                    <a href="<?= BASE_PATH ?>/pages/settings/admins.php">Admin Accounts</a>
+                    <a href="<?= BASE_PATH ?>/pages/settings/admins.php">Manage Admins</a>
                 </li>
                 <?php endif; ?>
+                <li class="nav-section">Account</li>
+                <li class="<?= $currentPage === 'profile' ? 'active' : '' ?>">
+                    <a href="<?= BASE_PATH ?>/pages/settings/profile.php">My Profile</a>
+                </li>
             </ul>
         </nav>
 

@@ -5,7 +5,7 @@
 $pageTitle = 'Custom Report';
 require_once __DIR__ . '/../../includes/header.php';
 $db = getDB();
-$departments = $db->query("SELECT id, name FROM departments WHERE status='active' ORDER BY name")->fetchAll();
+$departments = $db->query("SELECT id, name FROM grades WHERE status='active' ORDER BY name")->fetchAll();
 $employees = $db->query("SELECT id, pin, name FROM employees WHERE status='active' ORDER BY name")->fetchAll();
 $report = null;
 
@@ -19,7 +19,7 @@ if (isset($_POST['load_template'])) {
         $filters = json_decode($tpl['filters_json'], true) ?: [];
         $_POST['from_date'] = $filters['from_date'] ?? date('Y-m-01');
         $_POST['to_date'] = $filters['to_date'] ?? date('Y-m-d');
-        $_POST['department_id'] = $filters['department_id'] ?? '';
+        $_POST['grade_id'] = $filters['grade_id'] ?? '';
         $_POST['columns'] = json_decode($tpl['columns_json'], true) ?: [];
         $_POST['grouping'] = $tpl['grouping'] ?? 'summary';
     }
@@ -28,20 +28,20 @@ if (isset($_POST['load_template'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && !isset($_POST['load_template'])) {
     $fromDate = $_POST['from_date'] ?? date('Y-m-01');
     $toDate = $_POST['to_date'] ?? date('Y-m-d');
-    $deptFilter = $_POST['department_id'] ?? '';
+    $deptFilter = $_POST['grade_id'] ?? '';
     $columns = $_POST['columns'] ?? [];
     $grouping = $_POST['grouping'] ?? 'summary';
 
     $where = "WHERE ad.date BETWEEN ? AND ?";
     $params = [$fromDate, $toDate];
-    if ($deptFilter) { $where .= " AND e.department_id = ?"; $params[] = $deptFilter; }
+    if ($deptFilter) { $where .= " AND e.grade_id = ?"; $params[] = $deptFilter; }
 
     if ($grouping === 'detailed') {
-        $stmt = $db->prepare("SELECT ad.*, e.name as emp_name, e.pin as emp_pin, d.name as dept_name, e.designation, s.name as shift_name FROM attendance_daily ad JOIN employees e ON e.pin=ad.pin LEFT JOIN departments d ON d.id=e.department_id LEFT JOIN shifts s ON s.id=ad.shift_id {$where} ORDER BY e.name, ad.date");
+        $stmt = $db->prepare("SELECT ad.*, e.name as emp_name, e.pin as emp_pin, g.name as grade_name, e.designation, s.name as shift_name FROM attendance_daily ad JOIN employees e ON e.pin=ad.pin LEFT JOIN grades g ON g.id=e.grade_id LEFT JOIN shifts s ON s.id=ad.shift_id {$where} ORDER BY e.name, ad.date");
         $stmt->execute($params);
         $report = ['rows' => $stmt->fetchAll(), 'type' => 'detailed', 'columns' => $columns];
     } else {
-        $stmt = $db->prepare("SELECT e.pin, e.name as emp_name, d.name as dept_name, e.designation, s.name as shift_name,
+        $stmt = $db->prepare("SELECT e.pin, e.name as emp_name, g.name as grade_name, e.designation, s.name as shift_name,
             SUM(CASE WHEN ad.status IN('present','absent') THEN 1 ELSE 0 END) as work_days,
             SUM(CASE WHEN ad.status='present' THEN 1 ELSE 0 END) as days_present,
             SUM(CASE WHEN ad.was_late=1 THEN 1 ELSE 0 END) as days_late,
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && 
             COALESCE(SUM(ad.total_hours),0) as total_hours,
             COALESCE(SUM(ad.late_minutes),0) as total_late_min,
             COALESCE(SUM(ad.early_minutes),0) as total_early_min
-            FROM attendance_daily ad JOIN employees e ON e.pin=ad.pin LEFT JOIN departments d ON d.id=e.department_id
+            FROM attendance_daily ad JOIN employees e ON e.pin=ad.pin LEFT JOIN grades g ON g.id=e.grade_id
             LEFT JOIN employee_shifts es ON es.employee_id=e.id AND es.effective_from<=? AND (es.effective_to IS NULL OR es.effective_to>=?)
             LEFT JOIN shifts s ON s.id=es.shift_id
             {$where} GROUP BY e.pin ORDER BY e.name");
@@ -67,10 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && 
 <div class="form-row">
 <div class="form-group"><label>From</label><input type="date" name="from_date" value="<?= htmlspecialchars($_POST['from_date'] ?? date('Y-m-01')) ?>"></div>
 <div class="form-group"><label>To</label><input type="date" name="to_date" value="<?= htmlspecialchars($_POST['to_date'] ?? date('Y-m-d')) ?>"></div>
-<div class="form-group"><label>Department</label><select name="department_id"><option value="">All</option><?php foreach($departments as $d):?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option><?php endforeach;?></select></div>
+<div class="form-group"><label>Grade</label><select name="grade_id"><option value="">All</option><?php foreach($departments as $d):?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option><?php endforeach;?></select></div>
 </div>
 <div class="form-group"><label>Columns</label><div style="display:flex;flex-wrap:wrap;gap:12px">
-<?php $cols = ['pin'=>'PIN','name'=>'Name','department'=>'Department','designation'=>'Designation','shift'=>'Shift','work_days'=>'Work Days','present'=>'Present','late'=>'Late','early'=>'Early Leave','absent'=>'Absent','leave'=>'On Leave','holiday'=>'Holiday','weekend'=>'Weekend','hours'=>'Total Hours','late_min'=>'Late Minutes','early_min'=>'Early Minutes'];
+<?php $cols = ['pin'=>'PIN','name'=>'Name','grade'=>'Grade','designation'=>'Designation','shift'=>'Shift','work_days'=>'Work Days','present'=>'Present','late'=>'Late','early'=>'Early Leave','absent'=>'Absent','leave'=>'On Leave','holiday'=>'Holiday','weekend'=>'Weekend','hours'=>'Total Hours','late_min'=>'Late Minutes','early_min'=>'Early Minutes'];
 foreach($cols as $k=>$v): ?><label class="checkbox-label"><input type="checkbox" name="columns[]" value="<?=$k?>" checked><?=$v?></label><?php endforeach; ?>
 </div></div>
 <div class="form-group"><label>Grouping</label><select name="grouping"><option value="summary">One row per employee (summary)</option><option value="detailed">One row per day (detailed)</option></select></div>
@@ -99,9 +99,9 @@ if (isset($_POST['export']) && $_POST['export'] === 'csv') {
     header('Content-Disposition: attachment; filename="attendance_report_' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     if ($report['type'] === 'summary') {
-        fputcsv($out, ['PIN','Name','Dept','Work Days','Present','Late','Early','Absent','Leave','Hours','Late Min','Early Min']);
+        fputcsv($out, ['PIN','Name','Grade','Work Days','Present','Late','Early','Absent','Leave','Hours','Late Min','Early Min']);
         foreach ($report['rows'] as $r) {
-            fputcsv($out, [$r['pin'],$r['emp_name'],$r['dept_name']??'',$r['work_days'],$r['days_present'],$r['days_late'],$r['days_early'],$r['days_absent'],$r['days_leave'],$r['total_hours'],$r['total_late_min'],$r['total_early_min']]);
+            fputcsv($out, [$r['pin'],$r['emp_name'],$r['grade_name']??'',$r['work_days'],$r['days_present'],$r['days_late'],$r['days_early'],$r['days_absent'],$r['days_leave'],$r['total_hours'],$r['total_late_min'],$r['total_early_min']]);
         }
     } else {
         fputcsv($out, ['Date','PIN','Name','In','Out','Hours','Status','Late','Early']);
@@ -125,7 +125,7 @@ if (isset($_POST['export']) && $_POST['export'] === 'csv') {
 if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
     $tplName = trim($_POST['template_name']);
     $colsJson = json_encode($_POST['columns'] ?? []);
-    $filtersJson = json_encode(['from_date'=>$_POST['from_date']??'','to_date'=>$_POST['to_date']??'','department_id'=>$_POST['department_id']??'']);
+    $filtersJson = json_encode(['from_date'=>$_POST['from_date']??'','to_date'=>$_POST['to_date']??'','grade_id'=>$_POST['grade_id']??'']);
     $grouping = $_POST['grouping'] ?? 'summary';
     $db->prepare("INSERT INTO report_templates (name, created_by, columns_json, filters_json, grouping, created_at) VALUES (?, ?, ?, ?, ?, NOW())")->execute([$tplName, $_SESSION['user_id'], $colsJson, $filtersJson, $grouping]);
     echo '<div class="alert alert-success">Template "' . htmlspecialchars($tplName) . '" saved!</div>';
@@ -137,7 +137,7 @@ if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
 <?php if ($report['type']==='summary'): ?>
 <?php if(in_array('pin',$report['columns'])):?><th>PIN</th><?php endif;?>
 <?php if(in_array('name',$report['columns'])):?><th>Name</th><?php endif;?>
-<?php if(in_array('department',$report['columns'])):?><th>Dept</th><?php endif;?>
+<?php if(in_array('grade',$report['columns'])):?><th>Grade</th><?php endif;?>
 <?php if(in_array('work_days',$report['columns'])):?><th>Work Days</th><?php endif;?>
 <?php if(in_array('present',$report['columns'])):?><th>Present</th><?php endif;?>
 <?php if(in_array('late',$report['columns'])):?><th>Late</th><?php endif;?>
@@ -155,7 +155,7 @@ if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
 <?php if ($report['type']==='summary'): ?>
 <?php if(in_array('pin',$report['columns'])):?><td><?=$r['pin']?></td><?php endif;?>
 <?php if(in_array('name',$report['columns'])):?><td><?=htmlspecialchars($r['emp_name'])?></td><?php endif;?>
-<?php if(in_array('department',$report['columns'])):?><td><?=htmlspecialchars($r['dept_name']??'—')?></td><?php endif;?>
+<?php if(in_array('grade',$report['columns'])):?><td><?=htmlspecialchars($r['grade_name']??'—')?></td><?php endif;?>
 <?php if(in_array('work_days',$report['columns'])):?><td><?=$r['work_days']?></td><?php endif;?>
 <?php if(in_array('present',$report['columns'])):?><td><?=$r['days_present']?></td><?php endif;?>
 <?php if(in_array('late',$report['columns'])):?><td><?=$r['days_late']?></td><?php endif;?>
