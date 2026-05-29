@@ -35,7 +35,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* SIDEBAR HEADER / BRAND */
 .sidebar-header { padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
-.sidebar-brand { display: flex; align-items: center; gap: 12px; }
+.sidebar-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .sidebar-brand-icon { flex-shrink: 0; }
 .sidebar-brand-text h2 { font-size: 14px; font-weight: 600; margin-bottom: 1px; color: #f1f5f9; letter-spacing: -.2px; word-wrap: break-word; }
 .sidebar-brand-text small { color: rgba(148,163,184,.7); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; font-weight: 500; }
