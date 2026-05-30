@@ -48,7 +48,25 @@ async def get_approved_leave(employee_id: int, target_date: date) -> bool:
 
 
 async def get_employee_shift(employee_id: int, target_date: date) -> dict:
-    """Get the shift assigned to an employee for a given date."""
+    """
+    Get the effective shift for an employee on a given date.
+    First checks for active shift overrides (govt orders, Ramadan, etc.)
+    If override exists, returns it as a virtual shift dict.
+    Otherwise falls back to employee's assigned shift or default.
+    """
+    # Check for active shift override first
+    override = await get_active_shift_override(target_date)
+    if override:
+        return {
+            "id": None,
+            "name": override["name"],
+            "start_time": override["start_time"],
+            "end_time": override["end_time"],
+            "grace_minutes_late": override["grace_minutes_late"],
+            "grace_minutes_early": override["grace_minutes_early"],
+            "is_night_shift": False,
+        }
+
     async with get_db() as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -65,6 +83,24 @@ async def get_employee_shift(employee_id: int, target_date: date) -> dict:
                 return shift
             # Fallback to default shift (id=1)
             await cur.execute("SELECT * FROM shifts WHERE id = 1")
+            return await cur.fetchone()
+
+
+async def get_active_shift_override(target_date: date) -> dict:
+    """
+    Check if there's an active shift override for a given date.
+    Override applies if: status='active' AND from_date <= date AND (to_date IS NULL OR to_date >= date)
+    """
+    async with get_db() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """SELECT * FROM shift_overrides
+                   WHERE status = 'active'
+                   AND from_date <= %s
+                   AND (to_date IS NULL OR to_date >= %s)
+                   ORDER BY created_at DESC LIMIT 1""",
+                (target_date, target_date)
+            )
             return await cur.fetchone()
 
 

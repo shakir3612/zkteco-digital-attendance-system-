@@ -20,7 +20,7 @@ $punchCount = $db->query("SELECT COUNT(*) as cnt FROM attendance_raw")->fetch()[
         <table class="table table-compact" style="font-size:14px">
             <tbody>
                 <tr><td style="font-weight:600;width:160px">System</td><td><?= htmlspecialchars($companyName) ?> — Attendance Management System</td></tr>
-                <tr><td style="font-weight:600">Version</td><td>1.1.0</td></tr>
+                <tr><td style="font-weight:600">Version</td><td>1.2.0</td></tr>
                 <tr><td style="font-weight:600">Developer</td><td>Shakir Hossain</td></tr>
                 <tr><td style="font-weight:600">Contact</td><td>01946887117</td></tr>
                 <tr><td style="font-weight:600">Built</td><td>2026</td></tr>

@@ -11,11 +11,13 @@ A complete attendance management system that communicates with multiple ZKTeco S
 - **Import from Devices** — pull existing employees, biometrics, and attendance from running devices
 - **Attendance Processing** — automatic punch pairing every 5 minutes with configurable shift rules
 - **Manual Punch Entry** — add attendance for employees who missed punching
+- **Shift Overrides** — temporary office hours for govt orders, Ramadan, etc. (applies to all employees automatically)
 - **Employee Management** — CRUD with automatic push to all devices on add/edit/delete
 - **Shift Management** — multiple shifts with per-shift grace periods (default: 9 AM–5 PM, 30 min grace)
+- **Shift Overrides** — temporary office hours that override all shifts (for govt orders, Ramadan, etc.)
 - **Leave Management** — apply/approve/reject/edit/cancel with per-employee summary
 - **Holiday Calendar** — manage public holidays
-- **Reports** — single employee PDF report + custom report builder with selectable columns + CSV export
+- **Reports** — single employee A4 report (summary + filtered detail) + custom report builder with CSV export
 - **Notifications** — device offline/online alerts, mark all as read
 - **Audit Trail** — all admin actions logged
 - **Daily Time Sync** — automatic SET_TIME push to all devices at configurable hour
@@ -109,7 +111,7 @@ See [docs/setup.md](docs/setup.md) for detailed installation instructions.
 
 ## Version
 
-**v1.1.0** — See [changelog.txt](changelog.txt) for full change history.
+**v1.2.0** — See [changelog.txt](changelog.txt) for full change history.
 
 ## Developer
 

@@ -353,3 +353,24 @@ SELECT
 FROM attendance_raw
 WHERE DATE(punch_time) = CURDATE()
 GROUP BY device_sn;
+
+
+-- =============================================================================
+-- SHIFT OVERRIDES (Temporary office hours - govt orders, Ramadan, etc.)
+-- =============================================================================
+CREATE TABLE shift_overrides (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    grace_minutes_late INT DEFAULT 30,
+    grace_minutes_early INT DEFAULT 30,
+    from_date DATE NOT NULL,
+    to_date DATE DEFAULT NULL,
+    reason VARCHAR(255),
+    status ENUM('active','inactive') DEFAULT 'active',
+    created_by INT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_dates (from_date, to_date),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -65,9 +65,6 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                 <li class="<?= strpos($_SERVER['PHP_SELF'], 'attendance') !== false ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/attendance/daily.php">Daily View</a>
                 </li>
-                <li class="<?= strpos($_SERVER['PHP_SELF'], 'shifts') !== false ? 'active' : '' ?>">
-                    <a href="<?= BASE_PATH ?>/pages/shifts/list.php">Shifts</a>
-                </li>
                 <li class="<?= strpos($_SERVER['PHP_SELF'], 'leaves') !== false ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/leaves/list.php">Leaves</a>
                 </li>
@@ -82,6 +79,12 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                 <li class="nav-section">Admin</li>
                 <li class="<?= strpos($_SERVER['PHP_SELF'], 'settings') !== false && $currentPage === 'general' ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/settings/general.php">Settings</a>
+                </li>
+                <li class="<?= strpos($_SERVER['PHP_SELF'], 'shifts') !== false && $currentPage === 'list' ? 'active' : '' ?>">
+                    <a href="<?= BASE_PATH ?>/pages/shifts/list.php">Shifts</a>
+                </li>
+                <li class="<?= $currentPage === 'overrides' ? 'active' : '' ?>">
+                    <a href="<?= BASE_PATH ?>/pages/shifts/overrides.php">Office Hours Override</a>
                 </li>
                 <li class="<?= $currentPage === 'admins' ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/settings/admins.php">Manage Admins</a>

@@ -169,3 +169,44 @@ Changes made - Session 3 (2026-05-30)
     - Removed overflow:hidden from .card class
     - Was clipping searchable dropdown menus
     - File: php_dashboard/assets/css/style.css
+
+
+=================================================
+Changes made - Session 4 (2026-05-30)
+=================================================
+
+23. EMPLOYEE REPORT REDESIGN (A4 Print Format)
+    - Complete rewrite of pages/reports/employee.php
+    - Page 1: Summary only (company header, employee info, stats)
+    - Page 2+: Filtered daily detail table
+    - Checkbox filters: Present, Absent, Late, Early Leave, On Leave, Holiday,
+      Weekend, Single Punch, Total Hours, Total Late Min, Total Early Min
+    - Unchecked items hidden from BOTH summary and detail sections
+    - Default checked: Present, Absent, Late, On Leave, Holiday, Weekend
+    - CSS @media print with @page { size: A4 } for proper print formatting
+    - Page break between summary and detail
+    - Color-coded rows (red=absent, yellow=leave, green=holiday, gray=weekend)
+    - Form: employee dropdown + from/to dates on one line
+    - File: php_dashboard/pages/reports/employee.php
+
+24. SHIFT OVERRIDES (Temporary Office Hours)
+    - New table: shift_overrides (name, start/end time, grace, from/to date, reason, status)
+    - New page: php_dashboard/pages/shifts/overrides.php
+    - Add/deactivate/activate/delete overrides
+    - To date is optional — leave empty = "until further notice"
+    - Active override applies to ALL employees automatically
+    - Attendance processor checks for override before using employee's assigned shift
+    - Shows current status banner (active override or normal schedule)
+    - Use case: govt orders, Ramadan hours, summer schedule
+    - Files: database/schema.sql, python_server/workers/attendance_processor.py,
+             php_dashboard/pages/shifts/overrides.php, php_dashboard/includes/header.php
+
+25. SIDEBAR REORGANIZATION
+    - Moved Shifts and Office Hours Override from Attendance section to Admin section
+    - These are rarely modified settings, not daily operations
+    - Only visible to super_admin
+    - File: php_dashboard/includes/header.php
+
+26. VERSION BUMP TO v1.2.0
+    - Updated README.md with new features
+    - File: README.md

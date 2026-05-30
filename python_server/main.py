@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ZKTeco Attendance Server",
     description="Device communication server for ZKTeco SpeedFace V5L using PUSH/ADMS protocol",
-    version="1.0.0",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
@@ -114,7 +114,7 @@ async def root():
     return {
         "status": "running",
         "service": "ZKTeco Attendance Server",
-        "version": "1.0.0",
+        "version": "1.2.0",
         "timezone": SERVER_TIMEZONE,
     }
 
