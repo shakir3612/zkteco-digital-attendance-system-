@@ -62,27 +62,27 @@ $shifts = $db->query("
     <div class="card-body">
         <form method="POST">
             <input type="hidden" name="action" value="add">
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
                 <div class="form-group">
                     <label>Shift Name *</label>
-                    <input type="text" name="name" required placeholder="e.g., Morning Shift, Night Shift">
+                    <input type="text" name="name" required placeholder="e.g., Morning Shift">
                 </div>
                 <div class="form-group">
                     <label>Start Time *</label>
                     <input type="time" name="start_time" required value="09:00">
                 </div>
                 <div class="form-group">
+                    <label>Grace Late (min)</label>
+                    <input type="number" name="grace_minutes_late" value="30" min="0" max="120">
+                </div>
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="form-group">
                     <label>End Time *</label>
                     <input type="time" name="end_time" required value="17:00">
                 </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group">
-                    <label>Grace Late (minutes)</label>
-                    <input type="number" name="grace_minutes_late" value="30" min="0" max="120">
-                </div>
-                <div class="form-group">
-                    <label>Grace Early Leave (minutes)</label>
+                    <label>Grace Early (min)</label>
                     <input type="number" name="grace_minutes_early" value="30" min="0" max="120">
                 </div>
                 <div class="form-group">
