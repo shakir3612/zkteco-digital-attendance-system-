@@ -321,5 +321,34 @@ async def main():
     logger.info("Done.")
 
 
+# =============================================================================
+# BACKGROUND WORKER (runs every 5 minutes inside the server)
+# =============================================================================
+_running = False
+PROCESS_INTERVAL_SECONDS = 300  # 5 minutes
+
+
+async def start_attendance_worker():
+    """Start the attendance processor background loop. Processes today every 5 minutes."""
+    global _running
+    _running = True
+    logger.info("Attendance processor worker started (every 5 min)")
+
+    while _running:
+        try:
+            await process_today()
+        except Exception as e:
+            logger.error(f"Attendance processor error: {e}")
+
+        await asyncio.sleep(PROCESS_INTERVAL_SECONDS)
+
+
+async def stop_attendance_worker():
+    """Stop the attendance processor worker."""
+    global _running
+    _running = False
+    logger.info("Attendance processor worker stopped")
+
+
 if __name__ == "__main__":
     asyncio.run(main())

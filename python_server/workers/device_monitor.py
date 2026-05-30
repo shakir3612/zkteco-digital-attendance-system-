@@ -100,7 +100,7 @@ async def check_device_status():
                 await cur.execute(
                     """SELECT id FROM notifications
                        WHERE type = 'device_offline'
-                       AND title LIKE %s
+                       AND message LIKE %s
                        AND created_at > NOW() - INTERVAL 1 HOUR
                        LIMIT 1""",
                     (f"%{sn}%",)
@@ -139,11 +139,11 @@ async def check_device_status():
                 await cur.execute(
                     """SELECT id FROM notifications
                        WHERE type = 'device_offline'
-                       AND title LIKE %s
+                       AND message LIKE %s
                        AND created_at > NOW() - INTERVAL 2 HOUR
                        AND id > COALESCE(
                            (SELECT MAX(id) FROM notifications
-                            WHERE type = 'device_online' AND title LIKE %s),
+                            WHERE type = 'device_online' AND message LIKE %s),
                            0
                        )
                        LIMIT 1""",

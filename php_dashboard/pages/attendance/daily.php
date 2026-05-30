@@ -15,6 +15,56 @@ $statusFilter = $_GET['att_status'] ?? '';
 $syncMessage = '';
 $syncMessageType = '';
 
+// Handle manual punch entry
+if (isset($_POST['action']) && $_POST['action'] === 'manual_punch') {
+    $punchPin = trim($_POST['punch_pin'] ?? '');
+    $punchDate = $_POST['punch_date'] ?? '';
+    $punchTimeIn = trim($_POST['punch_time_in'] ?? '');
+    $punchTimeOut = trim($_POST['punch_time_out'] ?? '');
+    $punchReason = trim($_POST['punch_reason'] ?? 'Manual entry');
+
+    if (empty($punchPin) || empty($punchDate)) {
+        $syncMessage = 'Employee PIN and date are required.';
+        $syncMessageType = 'error';
+    } else {
+        // Verify employee exists
+        $empCheck = $db->prepare("SELECT id, name FROM employees WHERE pin = ?");
+        $empCheck->execute([$punchPin]);
+        $emp = $empCheck->fetch();
+
+        if (!$emp) {
+            $syncMessage = "Employee with PIN '{$punchPin}' not found.";
+            $syncMessageType = 'error';
+        } else {
+            $inserted = 0;
+            // Insert check-in punch
+            if ($punchTimeIn) {
+                $punchDatetimeIn = $punchDate . ' ' . $punchTimeIn . ':00';
+                $stmt = $db->prepare("INSERT IGNORE INTO attendance_raw (device_sn, pin, punch_time, status, verify_type, work_code, created_at) VALUES ('MANUAL', ?, ?, 0, 0, ?, NOW())");
+                $stmt->execute([$punchPin, $punchDatetimeIn, $punchReason]);
+                if ($stmt->rowCount() > 0) $inserted++;
+            }
+            // Insert check-out punch
+            if ($punchTimeOut) {
+                $punchDatetimeOut = $punchDate . ' ' . $punchTimeOut . ':00';
+                $stmt = $db->prepare("INSERT IGNORE INTO attendance_raw (device_sn, pin, punch_time, status, verify_type, work_code, created_at) VALUES ('MANUAL', ?, ?, 1, 0, ?, NOW())");
+                $stmt->execute([$punchPin, $punchDatetimeOut, $punchReason]);
+                if ($stmt->rowCount() > 0) $inserted++;
+            }
+
+            if ($inserted > 0) {
+                auditLog('manual_punch', 'employee', $emp['id'], "Manual punch for PIN={$punchPin} on {$punchDate} (In: {$punchTimeIn}, Out: {$punchTimeOut})");
+                $syncMessage = "Manual punch added for {$emp['name']} (PIN: {$punchPin}). {$inserted} record(s) inserted. Will be processed in next cycle.";
+                $syncMessageType = 'success';
+                $selectedDate = $punchDate;
+            } else {
+                $syncMessage = "No records inserted — punches may already exist for that time.";
+                $syncMessageType = 'error';
+            }
+        }
+    }
+}
+
 // Handle manual sync request
 if (isset($_POST['action']) && $_POST['action'] === 'process_attendance') {
     $processDate = $_POST['process_date'] ?? $selectedDate;
@@ -166,6 +216,40 @@ $processedCount = $stmt2->fetch()['cnt'];
             <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Process attendance for the selected date(s)?')">
                 &#8635; Process Now
             </button>
+        </form>
+    </div>
+</div>
+
+<!-- MANUAL PUNCH ENTRY -->
+<div class="card">
+    <div class="card-header">
+        <h3>Manual Punch Entry</h3>
+        <small class="text-muted">Add attendance for employees who missed punching</small>
+    </div>
+    <div class="card-body">
+        <form method="POST" class="filter-bar" style="flex-wrap:wrap">
+            <input type="hidden" name="action" value="manual_punch">
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">Employee PIN *</label>
+                <input type="text" name="punch_pin" placeholder="e.g. 101" required class="filter-input" style="min-width:100px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">Date *</label>
+                <input type="date" name="punch_date" value="<?= htmlspecialchars($selectedDate) ?>" required class="filter-input">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">Check-In Time</label>
+                <input type="time" name="punch_time_in" class="filter-input">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">Check-Out Time</label>
+                <input type="time" name="punch_time_out" class="filter-input">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label class="text-small">Reason</label>
+                <input type="text" name="punch_reason" placeholder="e.g. Forgot to punch" class="filter-input" style="min-width:150px">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Add manual punch?')">+ Add Punch</button>
         </form>
     </div>
 </div>

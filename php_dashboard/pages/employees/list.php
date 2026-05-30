@@ -2,10 +2,42 @@
 /**
  * Employees List - Search, filter by grade/status
  */
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/auth.php';
+requireLogin();
+
+$db = getDB();
+
+// Handle delete
+if (isset($_GET['delete']) && isset($_GET['pin'])) {
+    $pin = $_GET['pin'];
+    $emp = $db->prepare("SELECT id, name FROM employees WHERE pin = ?");
+    $emp->execute([$pin]);
+    $empData = $emp->fetch();
+    if ($empData) {
+        // Delete from employees
+        $db->prepare("DELETE FROM employees WHERE pin = ?")->execute([$pin]);
+        // Remove shift assignments
+        $db->prepare("DELETE FROM employee_shifts WHERE employee_id = ?")->execute([$empData['id']]);
+        // Queue DELETE_USER to all approved devices
+        $devices = $db->query("SELECT serial_number FROM devices WHERE status = 'approved'")->fetchAll();
+        foreach ($devices as $dev) {
+            $db->prepare("INSERT INTO device_commands (device_sn, command_type, command_content, priority, status, created_at) VALUES (?, 'DELETE_USER', ?, 2, 'pending', NOW())")
+               ->execute([$dev['serial_number'], "DATA DELETE USERINFO PIN={$pin}"]);
+        }
+        auditLog('employee_deleted', 'employee', $empData['id'], "Deleted PIN={$pin} ({$empData['name']})");
+        header('Location: ' . BASE_PATH . '/pages/employees/list.php?msg=' . urlencode("Employee {$empData['name']} (PIN: {$pin}) deleted."));
+        exit;
+    }
+}
+
 $pageTitle = 'Employees';
 require_once __DIR__ . '/../../includes/header.php';
 
-$db = getDB();
+if (isset($_GET['msg'])) {
+    echo '<div class="alert alert-success">' . htmlspecialchars($_GET['msg']) . '</div>';
+}
 
 // Filters
 $search = trim($_GET['search'] ?? '');
@@ -17,7 +49,10 @@ $where = [];
 $params = [];
 
 if ($search) {
-    $where[] = "(e.pin LIKE ? OR e.name LIKE ? OR e.phone LIKE ?)";
+    $where[] = "(e.pin LIKE ? OR e.name LIKE ? OR e.phone LIKE ? OR e.email LIKE ? OR e.designation LIKE ? OR e.card_number LIKE ?)";
+    $params[] = "%{$search}%";
+    $params[] = "%{$search}%";
+    $params[] = "%{$search}%";
     $params[] = "%{$search}%";
     $params[] = "%{$search}%";
     $params[] = "%{$search}%";
@@ -60,8 +95,8 @@ $grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER 
     <div class="card-body">
         <!-- FILTERS -->
         <form method="GET" class="filter-bar">
-            <input type="text" name="search" placeholder="Search PIN, name, phone..." 
-                   value="<?= htmlspecialchars($search) ?>" class="filter-input">
+            <input type="text" name="search" placeholder="Search PIN, name, phone, email, designation, card..." 
+                   value="<?= htmlspecialchars($search) ?>" class="filter-input" style="min-width:300px">
             <select name="grade" class="filter-select">
                 <option value="">All Grades</option>
                 <?php foreach ($grades as $g): ?>
@@ -77,10 +112,14 @@ $grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER 
                 <option value="terminated" <?= $statusFilter === 'terminated' ? 'selected' : '' ?>>Terminated</option>
             </select>
             <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+            <?php if ($search || $gradeFilter || $statusFilter !== 'active'): ?>
+            <a href="<?= BASE_PATH ?>/pages/employees/list.php" class="btn btn-xs btn-outline">Clear</a>
+            <?php endif; ?>
+            <input type="text" id="instantSearch" placeholder="Quick filter..." class="filter-input" style="margin-left:auto;min-width:180px">
         </form>
 
         <!-- TABLE -->
-        <table class="table">
+        <table class="table" id="employeesTable">
             <thead>
                 <tr>
                     <th>PIN</th>
@@ -116,5 +155,16 @@ $grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER 
         </table>
     </div>
 </div>
+
+<script>
+document.getElementById('instantSearch').addEventListener('input', function() {
+    var query = this.value.toLowerCase();
+    var rows = document.querySelectorAll('#employeesTable tbody tr');
+    rows.forEach(function(row) {
+        var text = row.textContent.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+});
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

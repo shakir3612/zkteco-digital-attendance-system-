@@ -1,0 +1,171 @@
+CHANGELOG - ZKTeco Attendance Management System
+=================================================
+Changes made after pulling from GitHub (2026-05-30)
+=================================================
+
+1. SIDEBAR LOGO LAYOUT
+   - Changed sidebar brand from horizontal (side-by-side) to vertical (logo on top, text below)
+   - File: php_dashboard/assets/css/style.css
+
+2. NOTIFICATION SYSTEM - MARK AS READ
+   - Added "mark all as read" functionality — clicking the notification badge resets the count
+   - Badge now links to dashboard notifications section (#notifications anchor)
+   - Badge only shows when there are unread notifications
+   - Badge styled as clickable link with hover effect
+   - Files: php_dashboard/includes/header.php, php_dashboard/assets/css/style.css,
+            php_dashboard/pages/dashboard.php
+
+3. ATTENDANCE AUTO-PROCESSING (Background Worker)
+   - Added attendance processor as automatic background worker (runs every 5 minutes)
+   - No more manual processing needed — raw punches are paired into daily records automatically
+   - Added start_attendance_worker() and stop_attendance_worker() functions
+   - Integrated into main.py lifespan alongside sync worker and device monitor
+   - Files: python_server/workers/attendance_processor.py, python_server/main.py
+
+4. DEVICE OFFLINE WARNING - REDUCED SPAM
+   - Fixed offline notification check to search in `message` field (contains SN) instead of `title`
+   - Offline warning now fires once per device per hour instead of every minute
+   - Same fix applied to "back online" detection logic
+   - Cleaned up spammed notifications from database
+   - File: python_server/workers/device_monitor.py
+
+5. DELETE FUNCTIONALITY
+   - Added delete button for employees (on Edit Employee page, bottom of form)
+     - Confirms before deleting
+     - Removes employee from DB
+     - Queues DELETE_USER command to all approved devices
+     - Audit logged
+   - Added delete button for devices (on Device Detail page, Actions section)
+     - Super_admin only
+     - Shows for ALL device statuses (approved, rejected, pending, suspended, inactive)
+     - Cancels pending commands, removes sync records, stamps, connection logs
+     - Audit logged
+   - Delete handler logic in list pages (employees/list.php, devices/list.php)
+   - Files: php_dashboard/pages/employees/list.php, php_dashboard/pages/employees/form.php,
+            php_dashboard/pages/devices/list.php, php_dashboard/pages/devices/detail.php
+
+6. ENHANCED EMPLOYEE SEARCH
+   - Server-side search now covers: PIN, Name, Phone, Email, Designation, Card Number
+   - Added client-side instant filter (no page reload, filters visible rows in real-time)
+   - Instant filter placed at far-right of filter bar row
+   - Added "Clear" button when filters are active
+   - File: php_dashboard/pages/employees/list.php
+
+7. SETUP DOCUMENTATION UPDATED
+   - Updated Step 5 to reflect automatic background workers (no Task Scheduler needed)
+   - Added table showing all 3 workers with intervals and purposes
+   - Updated verification checklist to include background workers check
+   - File: docs/setup.md
+
+8. DEMO DATA FILES (for testing)
+   - database/demo_employees.sql — 20 employees with PINs 101-120
+   - database/demo_device.sql — Virtual approved device (VDEV001) with 10 users + bio templates
+   - database/demo_punch.txt — Sample attendance punches for curl testing
+
+
+=================================================
+Changes made - Session 2 (2026-05-30)
+=================================================
+
+9. AUTOMATIC TIME SYNC WORKER
+   - Added time_sync_cron.py as a background worker (no Task Scheduler needed)
+   - Reads "Daily Time Sync Hour" from system_settings (configurable from Settings page)
+   - Fires once per day at the configured hour, queues SET_TIME to all approved devices
+   - Integrated into main.py lifespan (4th background worker)
+   - Files: python_server/workers/time_sync_cron.py, python_server/main.py
+
+10. MANUAL ATTENDANCE ENTRY
+    - Added manual punch entry form on Daily Attendance page
+    - Fields: Employee PIN, Date, Check-In Time, Check-Out Time, Reason
+    - Inserts into attendance_raw with device_sn='MANUAL'
+    - Auto-processed by background worker within 5 minutes
+    - Audit logged with reason
+    - File: php_dashboard/pages/attendance/daily.php
+
+11. DELETE BUTTON PLACEMENT (moved)
+    - Removed delete buttons from list pages (employees list, devices list)
+    - Employee delete: now on Edit Employee page (bottom of form)
+    - Device delete: now on Device Detail page (Actions section)
+    - Device delete shows for ALL statuses (approved, rejected, pending, suspended, inactive)
+    - Super_admin only for device deletion
+    - Files: php_dashboard/pages/employees/list.php, php_dashboard/pages/employees/form.php,
+             php_dashboard/pages/devices/list.php, php_dashboard/pages/devices/detail.php
+
+12. DEMO DATA FILES
+    - database/demo_employees.sql — 20 employees (PINs 101-120)
+    - database/demo_device.sql — Virtual approved device VDEV001 with 10 users + bio
+    - database/demo_punch.txt — Sample punch file for curl testing (tab-separated)
+
+13. PERFORMANCE COMPARISON REPORT
+    - Generated performance_comparison.txt comparing old system vs new system
+    - Covers: architecture, latency, resources, concurrency, reliability, security
+    - Overall score: Old 3.0/10, New 8.5/10
+
+14. DECISION: BIOPHOTO NOT IMPLEMENTED (by choice)
+    - Device display photos (BIOPHOTO/USERPIC) not synced server-side
+    - Reason: adds network overhead, storage cost, slows sync — not needed for attendance
+    - Photos still work locally on each device (stored during enrollment)
+    - Can be added later if needed
+
+
+=================================================
+Changes made - Session 3 (2026-05-30)
+=================================================
+
+15. LOGIN WITH EMAIL OR USERNAME
+    - Login now accepts either username or email in the same field
+    - Query checks both fields: WHERE (username = ? OR email = ?)
+    - Label updated to "Username or Email"
+    - Files: php_dashboard/includes/auth.php, php_dashboard/index.php
+
+16. LEAVE SUMMARY (Per Employee)
+    - Added Leave Summary section on Leaves page
+    - Select an employee → shows breakdown by type (Casual, Sick, Annual, etc.)
+    - Shows approved leaves for current year only
+    - Year changes automatically on Jan 1
+    - File: php_dashboard/pages/leaves/list.php
+
+17. LEAVE RECORDS - SEARCH + LIMIT
+    - Leave Records now shows only 10 most recent records by default
+    - Added search box to find specific records (by name, PIN, type, reason)
+    - When searching, shows up to 50 results
+    - Clear button to reset search
+    - File: php_dashboard/pages/leaves/list.php
+
+18. LEAVE EDIT/CANCEL AFTER APPROVAL
+    - Added "Cancel" button for approved leaves
+    - Added "Edit" button that opens a modal to modify dates, type, reason
+    - Auto-swap logic: if To date < From date, dates are swapped automatically
+    - To date is optional (defaults to From date = 1 day leave)
+    - Negative days no longer possible
+    - Audit logged
+    - File: php_dashboard/pages/leaves/list.php
+
+19. SEARCHABLE DROPDOWN FIX
+    - Fixed employee dropdown in Leave Summary not showing search
+    - Removed filter-select class that was blocking the enhancement
+    - Constrained dropdown width to 300px for better appearance
+    - File: php_dashboard/pages/leaves/list.php
+
+20. ABOUT / SYSTEM INFORMATION PAGE
+    - Created pages/about.php with system info + live stats
+    - Shows: Version 1.1.0, Developer (Shakir Hossain), Contact, Stack
+    - Live stats: employees, devices, punch records, server time, PHP version
+    - Accessible from:
+      - Sidebar (under Account section)
+      - Footer ("About" link on right side)
+      - Login page ("About System" popup modal, no login required)
+    - Files: php_dashboard/pages/about.php, php_dashboard/includes/footer.php,
+             php_dashboard/includes/header.php, php_dashboard/index.php,
+             php_dashboard/assets/css/style.css
+
+21. LOGIN PAGE RESPONSIVE FIX
+    - Reduced card padding and margins to fit 1366x768 screens
+    - Made page scrollable (overflow-y: auto) for when alert messages appear
+    - Tightened button spacing
+    - File: php_dashboard/assets/css/style.css
+
+22. CSS FIX - CARD OVERFLOW
+    - Removed overflow:hidden from .card class
+    - Was clipping searchable dropdown menus
+    - File: php_dashboard/assets/css/style.css

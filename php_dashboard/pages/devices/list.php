@@ -2,10 +2,42 @@
 /**
  * Devices List - All devices with status + online/offline indicator
  */
+session_start();
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../includes/auth.php';
+requireLogin();
+
+$db = getDB();
+
+// Handle delete
+if (isset($_GET['delete']) && isset($_GET['sn'])) {
+    requireSuperAdmin();
+    $sn = $_GET['sn'];
+    $device = $db->prepare("SELECT id, name FROM devices WHERE serial_number = ?");
+    $device->execute([$sn]);
+    $devData = $device->fetch();
+    if ($devData) {
+        // Cancel pending commands
+        $db->prepare("UPDATE device_commands SET status = 'cancelled' WHERE device_sn = ? AND status = 'pending'")->execute([$sn]);
+        // Delete related records
+        $db->prepare("DELETE FROM device_employees WHERE device_sn = ?")->execute([$sn]);
+        $db->prepare("DELETE FROM device_stamps WHERE device_sn = ?")->execute([$sn]);
+        $db->prepare("DELETE FROM device_connection_log WHERE device_sn = ?")->execute([$sn]);
+        // Delete the device
+        $db->prepare("DELETE FROM devices WHERE serial_number = ?")->execute([$sn]);
+        auditLog('device_deleted', 'device', $devData['id'], "Deleted device SN={$sn} ({$devData['name']})");
+        header('Location: ' . BASE_PATH . '/pages/devices/list.php?msg=' . urlencode("Device {$devData['name']} (SN: {$sn}) deleted."));
+        exit;
+    }
+}
+
 $pageTitle = 'All Devices';
 require_once __DIR__ . '/../../includes/header.php';
 
-$db = getDB();
+if (isset($_GET['msg'])) {
+    echo '<div class="alert alert-success">' . htmlspecialchars($_GET['msg']) . '</div>';
+}
+
 $settings = getSettings(['offline_threshold_minutes', 'idle_threshold_minutes']);
 $offlineMin = (int)($settings['offline_threshold_minutes'] ?? 10);
 $idleMin = (int)($settings['idle_threshold_minutes'] ?? 2);

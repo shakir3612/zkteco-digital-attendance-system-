@@ -1,23 +1,34 @@
 """
 Time Sync Cron - Pushes SET_TIME command to all approved devices.
-Runs daily at 3:00 AM (configurable via system_settings.time_sync_hour).
+Runs daily at the configured hour (system_settings.time_sync_hour).
 
-Schedule via Windows Task Scheduler:
-  Program: C:\\path\\to\\venv\\Scripts\\python.exe
-  Arguments: -m workers.time_sync_cron
-  Start in: C:\\path\\to\\python_server
-  Trigger: Daily at 03:00
+Also runs as a background worker inside the main server — checks every minute
+if it's time to sync, and fires once per day at the configured hour.
 
 Or run standalone: python -m workers.time_sync_cron
 """
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from database import get_db, init_db_pool, close_db_pool
 from services.command import queue_set_time_command
 
 logger = logging.getLogger(__name__)
+
+_running = False
+_last_sync_date = None  # Track which date we last synced on
+
+
+async def get_sync_hour() -> int:
+    """Get the configured time sync hour from system_settings."""
+    async with get_db() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT setting_value FROM system_settings WHERE setting_key = 'time_sync_hour'"
+            )
+            row = await cur.fetchone()
+            return int(row["setting_value"]) if row else 3
 
 
 async def sync_time_all_devices():
@@ -44,6 +55,37 @@ async def sync_time_all_devices():
 
     logger.info(f"Time sync queued for {count}/{len(devices)} devices")
     return count
+
+
+async def start_time_sync_worker():
+    """Background worker that checks every 60 seconds if it's time to sync."""
+    global _running, _last_sync_date
+    _running = True
+    logger.info("Time sync worker started")
+
+    while _running:
+        try:
+            now = datetime.now()
+            sync_hour = await get_sync_hour()
+            today = now.date()
+
+            # Fire once per day at the configured hour
+            if now.hour == sync_hour and _last_sync_date != today:
+                _last_sync_date = today
+                logger.info(f"Daily time sync triggered (hour={sync_hour})")
+                count = await sync_time_all_devices()
+                logger.info(f"Time sync complete: {count} devices queued")
+        except Exception as e:
+            logger.error(f"Time sync worker error: {e}")
+
+        await asyncio.sleep(60)
+
+
+async def stop_time_sync_worker():
+    """Stop the time sync worker."""
+    global _running
+    _running = False
+    logger.info("Time sync worker stopped")
 
 
 async def main():

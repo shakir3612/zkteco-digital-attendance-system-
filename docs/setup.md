@@ -103,20 +103,28 @@ For remote devices to reach your server:
 
 ---
 
-## Step 5: Windows Task Scheduler (Cron Jobs)
+## Step 5: Background Workers (Automatic)
 
-### Daily Attendance Processing (run at 11:55 PM):
+The Python server runs these background workers automatically on startup:
+
+| Worker | Interval | Purpose |
+|---|---|---|
+| Sync Worker | Every 5 seconds | Distributes biometric templates to devices |
+| Device Monitor | Every 60 seconds | Detects offline devices, creates notifications |
+| Attendance Processor | Every 5 minutes | Pairs raw punches into daily records (late/early/absent) |
+
+**No Task Scheduler needed for attendance processing** — it happens automatically while the server is running.
+
+### Optional: Daily Time Sync (Windows Task Scheduler)
+
+If you want to force-sync device clocks daily at 3:00 AM:
 ```cmd
-Task: Attendance Processor
+Task: ZKTeco Time Sync
 Program: C:\path\to\venv\Scripts\python.exe
-Arguments: -m workers.attendance_processor
+Arguments: -m workers.time_sync_cron
 Start in: C:\path\to\attendance_system\python_server
-Trigger: Daily at 23:55
+Trigger: Daily at 03:00
 ```
-
-### Daily Time Sync (run at 3:00 AM):
-The Python server handles this automatically via the `device_monitor` worker,
-but you can also schedule it manually if needed.
 
 ---
 
@@ -138,6 +146,7 @@ To keep the Python server running even after logout, use NSSM:
 
 - [ ] MySQL running with `attendance_system` database (20 tables)
 - [ ] Python server running on port 8015
+- [ ] Background workers active (sync + device monitor + attendance processor)
 - [ ] PHP dashboard accessible via Apache
 - [ ] Can log in with admin/admin123
 - [ ] Port 8015 reachable from outside (test with phone on mobile data)

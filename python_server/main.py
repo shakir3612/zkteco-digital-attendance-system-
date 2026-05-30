@@ -49,10 +49,14 @@ async def lifespan(app: FastAPI):
     import asyncio
     from workers.sync_worker import start_sync_worker, stop_sync_worker
     from workers.device_monitor import start_device_monitor, stop_device_monitor
+    from workers.attendance_processor import start_attendance_worker, stop_attendance_worker
+    from workers.time_sync_cron import start_time_sync_worker, stop_time_sync_worker
 
     sync_task = asyncio.create_task(start_sync_worker())
     monitor_task = asyncio.create_task(start_device_monitor())
-    logger.info("Background workers started (sync + device monitor)")
+    attendance_task = asyncio.create_task(start_attendance_worker())
+    time_sync_task = asyncio.create_task(start_time_sync_worker())
+    logger.info("Background workers started (sync + device monitor + attendance processor + time sync)")
 
     yield
 
@@ -60,8 +64,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
     await stop_sync_worker()
     await stop_device_monitor()
+    await stop_attendance_worker()
+    await stop_time_sync_worker()
     sync_task.cancel()
     monitor_task.cancel()
+    attendance_task.cancel()
+    time_sync_task.cancel()
     await close_db_pool()
     logger.info("Server stopped")
 

@@ -149,7 +149,7 @@ $pendingDevices = $stmt->fetchAll();
     </div>
 
     <!-- RECENT NOTIFICATIONS -->
-    <div class="card">
+    <div class="card" id="notifications">
         <div class="card-header">
             <h3>Recent Notifications</h3>
         </div>

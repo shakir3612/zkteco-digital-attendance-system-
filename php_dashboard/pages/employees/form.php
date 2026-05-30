@@ -182,6 +182,9 @@ if ($id && !$employee) {
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary"><?= $id ? 'Update' : 'Add Employee' ?></button>
                 <a href="<?= BASE_PATH ?>/pages/employees/list.php" class="btn btn-outline">Back to List</a>
+                <?php if ($id): ?>
+                <a href="<?= BASE_PATH ?>/pages/employees/list.php?delete=1&pin=<?= urlencode($employee['pin']) ?>" class="btn btn-danger" style="margin-left:auto" onclick="return confirm('Delete <?= htmlspecialchars($employee['name']) ?> (PIN: <?= $employee['pin'] ?>)? This will also remove from all devices.')">Delete Employee</a>
+                <?php endif; ?>
             </div>
         </form>
     </div>

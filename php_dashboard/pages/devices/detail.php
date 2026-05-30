@@ -143,9 +143,23 @@ $ackCmds24h = $stmt->fetch()['cnt'];
                 <button type="submit" name="action" value="suspend" class="btn btn-danger" onclick="return confirm('Suspend this device?')">Suspend</button>
             </form>
             <a href="<?= BASE_PATH ?>/pages/devices/manage.php?sn=<?= urlencode($sn) ?>" class="btn btn-outline">Edit Details</a>
+            <?php if (isSuperAdmin()): ?>
+            <a href="<?= BASE_PATH ?>/pages/devices/list.php?delete=1&sn=<?= urlencode($sn) ?>" class="btn btn-danger" onclick="return confirm('Permanently delete this device and all related data?')">Delete Device</a>
+            <?php endif; ?>
         </div>
     </div>
 </div>
+<?php else: ?>
+<?php if (isSuperAdmin()): ?>
+<div class="card">
+    <div class="card-header"><h3>Actions</h3></div>
+    <div class="card-body">
+        <div class="action-buttons">
+            <a href="<?= BASE_PATH ?>/pages/devices/list.php?delete=1&sn=<?= urlencode($sn) ?>" class="btn btn-danger" onclick="return confirm('Permanently delete this device and all related data?')">Delete Device</a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 
 <!-- CONNECTION LOG -->

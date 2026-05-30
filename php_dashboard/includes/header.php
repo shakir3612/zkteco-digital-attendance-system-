@@ -2,6 +2,18 @@
 require_once __DIR__ . '/auth.php';
 requireLogin();
 $user = currentUser();
+
+// Handle mark-all-read action
+if (isset($_GET['mark_read']) && $_GET['mark_read'] === '1') {
+    $db = getDB();
+    $role = $_SESSION['user_role'];
+    $stmt = $db->prepare("UPDATE notifications SET is_read = 1, read_by = ? WHERE is_read = 0 AND (target_role = 'all' OR target_role = ?)");
+    $stmt->execute([$_SESSION['user_id'], $role]);
+    // Redirect to dashboard notifications section
+    header('Location: ' . BASE_PATH . '/pages/dashboard.php#notifications');
+    exit;
+}
+
 $notifCount = getUnreadNotificationCount();
 $companyName = getSetting('company_name', 'Attendance System');
 $currentPage = basename($_SERVER['PHP_SELF'], '.php');
@@ -79,6 +91,9 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                 <li class="<?= $currentPage === 'profile' ? 'active' : '' ?>">
                     <a href="<?= BASE_PATH ?>/pages/settings/profile.php">My Profile</a>
                 </li>
+                <li class="<?= $currentPage === 'about' ? 'active' : '' ?>">
+                    <a href="<?= BASE_PATH ?>/pages/about.php">About</a>
+                </li>
             </ul>
         </nav>
 
@@ -91,9 +106,11 @@ $currentPage = basename($_SERVER['PHP_SELF'], '.php');
                     <h1 class="page-title"><?= htmlspecialchars($pageTitle ?? 'Dashboard') ?></h1>
                 </div>
                 <div class="top-bar-right">
-                    <span class="notification-badge" title="<?= $notifCount ?> unread notifications">
-                        <?= $notifCount > 0 ? $notifCount : '' ?>
-                    </span>
+                    <?php if ($notifCount > 0): ?>
+                    <a href="<?= BASE_PATH ?>/pages/dashboard.php?mark_read=1#notifications" class="notification-badge" title="Click to mark all as read">
+                        <?= $notifCount ?>
+                    </a>
+                    <?php endif; ?>
                     <span class="user-info">
                         <?= htmlspecialchars($user['name']) ?>
                         <small>(<?= $user['role'] ?>)</small>

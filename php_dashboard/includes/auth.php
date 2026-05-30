@@ -71,8 +71,8 @@ function requireSuperAdmin(): void {
  */
 function attemptLogin(string $username, string $password): bool {
     $db = getDB();
-    $stmt = $db->prepare("SELECT * FROM users WHERE username = ? AND status = 'active'");
-    $stmt->execute([$username]);
+    $stmt = $db->prepare("SELECT * FROM users WHERE (username = ? OR email = ?) AND status = 'active'");
+    $stmt->execute([$username, $username]);
     $user = $stmt->fetch();
 
     if (!$user) return false;

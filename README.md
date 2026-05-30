@@ -9,12 +9,16 @@ A complete attendance management system that communicates with multiple ZKTeco S
 - **Real-Time Monitoring** — live online/idle/offline status for all devices (30s auto-refresh)
 - **Biometric Sync** — face/fingerprint templates automatically distributed to all approved devices
 - **Import from Devices** — pull existing employees, biometrics, and attendance from running devices
-- **Attendance Processing** — daily punch pairing with configurable shift rules and grace periods
+- **Attendance Processing** — automatic punch pairing every 5 minutes with configurable shift rules
+- **Manual Punch Entry** — add attendance for employees who missed punching
 - **Employee Management** — CRUD with automatic push to all devices on add/edit/delete
 - **Shift Management** — multiple shifts with per-shift grace periods (default: 9 AM–5 PM, 30 min grace)
-- **Leave & Holiday** — leave application/approval workflow + holiday calendar
-- **Reports** — single employee PDF report + custom report builder with selectable columns
+- **Leave Management** — apply/approve/reject/edit/cancel with per-employee summary
+- **Holiday Calendar** — manage public holidays
+- **Reports** — single employee PDF report + custom report builder with selectable columns + CSV export
+- **Notifications** — device offline/online alerts, mark all as read
 - **Audit Trail** — all admin actions logged
+- **Daily Time Sync** — automatic SET_TIME push to all devices at configurable hour
 
 ## Architecture
 
@@ -40,13 +44,22 @@ A complete attendance management system that communicates with multiple ZKTeco S
 | Device Communication | Python 3.9+ / FastAPI / Uvicorn (port 8015) |
 | Web Dashboard | PHP 7.4+ / XAMPP Apache (port 80) |
 | Database | MySQL 5.7+ (XAMPP) |
-| Background Workers | Python asyncio tasks |
+| Background Workers | Python asyncio tasks (4 workers) |
+
+## Background Workers (Automatic)
+
+| Worker | Interval | Purpose |
+|---|---|---|
+| Sync Worker | Every 5 seconds | Distributes biometric templates to devices |
+| Device Monitor | Every 60 seconds | Detects offline devices, creates notifications |
+| Attendance Processor | Every 5 minutes | Pairs raw punches into daily records |
+| Time Sync | Once per day | Pushes SET_TIME to all devices at configured hour |
 
 ## Quick Start
 
 1. **Database:** Run `database/schema.sql` then `database/seed.sql` in MySQL
 2. **Python Server:** `cd python_server && pip install -r requirements.txt && python run.py`
-3. **PHP Dashboard:** Copy `php_dashboard/` to XAMPP htdocs, access via browser
+3. **PHP Dashboard:** Copy/link `php_dashboard/` to XAMPP htdocs as `attendance`
 4. **Login:** username `admin`, password `admin123` (change immediately!)
 5. **Configure Devices:** Set ADMS URL to `http://YOUR_IP:8015/iclock`
 
@@ -58,7 +71,7 @@ See [docs/setup.md](docs/setup.md) for detailed installation instructions.
 ├── python_server/          # FastAPI — Device communication + Internal API
 │   ├── routes/             # /iclock endpoints + /api internal endpoints
 │   ├── services/           # Business logic (sync, commands, attendance, import)
-│   ├── workers/            # Background tasks (sync, monitor, attendance processor)
+│   ├── workers/            # Background tasks (sync, monitor, attendance, time sync)
 │   └── middleware/         # Device authorization checks
 ├── php_dashboard/          # PHP — Admin web interface
 │   ├── pages/              # All dashboard pages (devices, employees, reports, etc.)
@@ -78,11 +91,13 @@ See [docs/setup.md](docs/setup.md) for detailed installation instructions.
 ## Key Decisions
 
 - **Timezone:** Asia/Dhaka — all devices sync clock from server
-- **Weekend:** Friday + Saturday (configurable)
+- **Weekend:** Friday + Saturday (configurable from Settings)
 - **Grace Period:** 30 minutes for check-in and check-out (configurable per shift)
 - **Punch Logic:** First punch = in, last punch = out (middle punches stored but ignored)
 - **No half-day / no overtime** — status is present or absent, with late/early flags
 - **Offline threshold:** 10 minutes (configurable) — triggers dashboard notification
+- **Attendance processing:** Automatic every 5 minutes (no cron/Task Scheduler needed)
+- **Time sync:** Automatic daily at configured hour + on every device handshake via ServerTime
 
 ## Default Credentials
 
@@ -91,6 +106,14 @@ See [docs/setup.md](docs/setup.md) for detailed installation instructions.
 | admin | admin123 | super_admin |
 
 **Change the password immediately after first login.**
+
+## Version
+
+**v1.1.0** — See [changelog.txt](changelog.txt) for full change history.
+
+## Developer
+
+Shakir Hossain — 01946887117
 
 ## License
 
