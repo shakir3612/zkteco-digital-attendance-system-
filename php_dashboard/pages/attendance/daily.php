@@ -53,6 +53,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'manual_punch') {
             }
 
             if ($inserted > 0) {
+                // Enqueue date for automatic reprocessing
+                $db->prepare("INSERT IGNORE INTO attendance_reprocess_queue (target_date, reason) VALUES (?, 'manual_punch')")->execute([$punchDate]);
                 auditLog('manual_punch', 'employee', $emp['id'], "Manual punch for PIN={$punchPin} on {$punchDate} (In: {$punchTimeIn}, Out: {$punchTimeOut})");
                 $syncMessage = "Manual punch added for {$emp['name']} (PIN: {$punchPin}). {$inserted} record(s) inserted. Will be processed in next cycle.";
                 $syncMessageType = 'success';
