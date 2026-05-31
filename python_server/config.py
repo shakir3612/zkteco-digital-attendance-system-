@@ -41,6 +41,18 @@ DEVICE_OFFLINE_THRESHOLD_MINUTES = int(os.getenv("DEVICE_OFFLINE_THRESHOLD", "10
 # Rate limiting for device registration (max new registrations per IP per hour)
 DEVICE_REG_RATE_LIMIT = int(os.getenv("DEVICE_REG_RATE_LIMIT", "10"))
 
+# Maximum size (in bytes) of a single device push to POST /iclock/cdata.
+# A device that was offline (or a fresh install with many biometric templates)
+# can push large batches; this must be >= the device's natural per-POST chunk so
+# legitimate pushes are never rejected, but finite to protect the server from a
+# runaway/oversized payload. Default 32 MB. Override via MAX_PUSH_BYTES (bytes)
+# or MAX_PUSH_MB (megabytes, takes precedence if set).
+_max_push_mb = os.getenv("MAX_PUSH_MB")
+if _max_push_mb:
+    MAX_PUSH_BYTES = int(float(_max_push_mb) * 1024 * 1024)
+else:
+    MAX_PUSH_BYTES = int(os.getenv("MAX_PUSH_BYTES", str(32 * 1024 * 1024)))
+
 # =============================================================================
 # LOGGING
 # =============================================================================

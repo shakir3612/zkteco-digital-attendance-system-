@@ -309,3 +309,26 @@ Changes made - Session 5 (2026-05-31)
     - Migration for existing databases: database/migrations/001_missed_data_recovery.sql
       (run once:  mysql -u root attendance_system < database/migrations/001_missed_data_recovery.sql)
     - Note: the attendance processor now runs every 2 minutes (was 5).
+
+
+
+=================================================
+Changes made - Session 6 (2026-05-31)
+=================================================
+
+31. CONFIGURABLE DEVICE PUSH SIZE LIMIT + REJECTION ALERT
+    - The POST /iclock/cdata payload limit (was a hard-coded 10 MB) is now
+      configurable and defaults to 32 MB. This headroom covers a fresh install
+      where devices push the full biometric set (~500 employees, face+fingerprint
+      is only ~5-8 MB total, and devices send it in batches well under 32 MB),
+      while staying finite to protect the server from a runaway payload.
+        * config.py: MAX_PUSH_BYTES (default 32*1024*1024). Override via env
+          MAX_PUSH_BYTES (bytes) or MAX_PUSH_MB (megabytes, takes precedence).
+    - On rejection (HTTP 413), the server now raises a 'sync_failed' dashboard
+      notification instead of failing silently. A device retries the SAME batch
+      on a non-OK response, so the alert is RATE-LIMITED to once per device per
+      hour to avoid flooding the notifications table during a retry loop.
+        * services/notification.py: notify_oversized_push() (rate-limited).
+        * routes/iclock.py: uses MAX_PUSH_BYTES; alerts admins on oversize.
+    - Files: python_server/config.py, python_server/services/notification.py,
+             python_server/routes/iclock.py

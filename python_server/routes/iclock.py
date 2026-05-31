@@ -25,8 +25,9 @@ from services.device import (
     get_all_stamps_for_device,
 )
 from services.attendance import process_attlog_body
-from services.notification import notify_new_device
+from services.notification import notify_new_device, notify_oversized_push
 from services.reprocess import enqueue_dates
+from config import MAX_PUSH_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -148,11 +149,14 @@ async def receive_device_data(
     """
     ip_address = get_client_ip(request)
     body_bytes = await request.body()
-    
-    # Reject oversized payloads (max 10MB)
-    if len(body_bytes) > 10 * 1024 * 1024:
+
+    # Reject oversized payloads (configurable, default 32 MB). The device retries the
+    # SAME batch on a non-OK response, so we alert admins (rate-limited to once/hour
+    # per device) rather than letting it fail silently in a loop.
+    if len(body_bytes) > MAX_PUSH_BYTES:
+        await notify_oversized_push(SN, len(body_bytes), MAX_PUSH_BYTES, table)
         return PlainTextResponse(content="ERROR: PAYLOAD_TOO_LARGE", status_code=413)
-    
+
     body = body_bytes.decode("utf-8", errors="ignore")
 
     # Always update heartbeat
