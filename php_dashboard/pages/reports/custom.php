@@ -5,7 +5,7 @@
 $pageTitle = 'Custom Report';
 require_once __DIR__ . '/../../includes/header.php';
 $db = getDB();
-$departments = $db->query("SELECT id, name FROM grades WHERE status='active' ORDER BY name")->fetchAll();
+$grades = $db->query("SELECT id, name FROM grades WHERE status='active' ORDER BY name")->fetchAll();
 $employees = $db->query("SELECT id, pin, name FROM employees WHERE status='active' ORDER BY name")->fetchAll();
 $report = null;
 
@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && 
 <div class="form-row">
 <div class="form-group"><label>From</label><input type="date" name="from_date" value="<?= htmlspecialchars($_POST['from_date'] ?? date('Y-m-01')) ?>"></div>
 <div class="form-group"><label>To</label><input type="date" name="to_date" value="<?= htmlspecialchars($_POST['to_date'] ?? date('Y-m-d')) ?>"></div>
-<div class="form-group"><label>Grade</label><select name="grade_id"><option value="">All</option><?php foreach($departments as $d):?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option><?php endforeach;?></select></div>
+<div class="form-group"><label>Grade</label><select name="grade_id"><option value="">All</option><?php foreach($grades as $d):?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option><?php endforeach;?></select></div>
 </div>
 <div class="form-group"><label>Columns</label><div style="display:flex;flex-wrap:wrap;gap:12px">
 <?php $cols = ['pin'=>'PIN','name'=>'Name','grade'=>'Grade','designation'=>'Designation','shift'=>'Shift','work_days'=>'Work Days','present'=>'Present','duty'=>'Holiday/Weekend Duty','late'=>'Late','early'=>'Early Leave','absent'=>'Absent','pending'=>'Pending/No Data','leave'=>'On Leave','holiday'=>'Holiday','weekend'=>'Weekend','hours'=>'Total Hours','late_min'=>'Late Minutes','early_min'=>'Early Minutes'];

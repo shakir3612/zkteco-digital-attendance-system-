@@ -42,7 +42,7 @@ class Employee:
     id: int = 0
     pin: str = ""
     name: str = ""
-    department_id: Optional[int] = None
+    grade_id: Optional[int] = None
     designation: Optional[str] = None
     card_number: Optional[str] = None
     privilege: int = 0

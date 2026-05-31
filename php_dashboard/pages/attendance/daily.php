@@ -159,7 +159,7 @@ foreach ($records as $r) {
     elseif ($r['status'] === 'weekend') $summary['weekend']++;
 }
 
-$departments = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
+$grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
 
 // Check if processing has been done
 $stmt2 = $db->prepare("SELECT COUNT(*) as cnt FROM attendance_daily WHERE date = ?");
@@ -174,7 +174,7 @@ $processedCount = $stmt2->fetch()['cnt'];
             <input type="date" name="date" value="<?= htmlspecialchars($selectedDate) ?>" class="filter-input">
             <select name="grade" class="filter-select">
                 <option value="">All Grades</option>
-                <?php foreach ($departments as $dept): ?>
+                <?php foreach ($grades as $dept): ?>
                     <option value="<?= $dept['id'] ?>" <?= $deptFilter == $dept['id'] ? 'selected' : '' ?>><?= htmlspecialchars($dept['name']) ?></option>
                 <?php endforeach; ?>
             </select>

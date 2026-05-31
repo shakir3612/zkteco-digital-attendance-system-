@@ -20,7 +20,7 @@ if ($id) {
     $employee = $stmt->fetch();
 }
 
-$departments = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
+$grades = $db->query("SELECT id, name FROM grades WHERE status = 'active' ORDER BY name")->fetchAll();
 $shifts = $db->query("SELECT id, name, start_time, end_time FROM shifts WHERE status = 'active'")->fetchAll();
 
 // Handle form submission BEFORE any output
@@ -126,7 +126,7 @@ if ($id && !$employee) {
                     <label for="grade_id">Grade</label>
                     <select id="grade_id" name="grade_id">
                         <option value="">— None —</option>
-                        <?php foreach ($departments as $dept): ?>
+                        <?php foreach ($grades as $dept): ?>
                             <option value="<?= $dept['id'] ?>" <?= ($employee['grade_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>><?= htmlspecialchars($dept['name']) ?></option>
                         <?php endforeach; ?>
                     </select>

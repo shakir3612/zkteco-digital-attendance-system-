@@ -14,7 +14,7 @@ $filters = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $filters = $_POST['filters'] ?? [];
 } else {
-    $filters = ['late','on_leave','holiday','weekend','pending'];
+    $filters = ['late','on_leave','holiday','weekend','pending','single_punch'];
 }
 // Force present + absent to always be included.
 if (!in_array('present', $filters)) $filters[] = 'present';
@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
             // Summary. NOTE: work_days = present + absent only; 'pending'/'unprocessed'
             // days are NOT counted as absent (we don't yet trust the data is complete).
             // Holiday/weekend duty (worked_on_off_day) counts as present.
-            $summary = ['work_days'=>0,'present'=>0,'absent'=>0,'late'=>0,'early'=>0,'leave'=>0,
+            $summary = ['work_days'=>0,'present'=>0,'proper_present'=>0,'absent'=>0,'late'=>0,'early'=>0,'leave'=>0,
                         'holiday'=>0,'weekend'=>0,'single_punch'=>0,'pending'=>0,'holiday_duty'=>0,
                         'late_min'=>0,'early_min'=>0];
             foreach ($days as $r) {
@@ -92,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
                         if (!empty($r['was_late']))  { $summary['late']++;  $summary['late_min']  += $r['late_minutes']; }
                         if (!empty($r['left_early'])){ $summary['early']++; $summary['early_min'] += $r['early_minutes']; }
                         if (!empty($r['single_punch'])) $summary['single_punch']++;
+                        // "Proper" present = present, on time, and not a single punch.
+                        if (empty($r['was_late']) && empty($r['single_punch'])) $summary['proper_present']++;
                         break;
                     case 'absent':       $summary['absent']++; $summary['work_days']++; break;
                     case 'on_leave':     $summary['leave']++;   break;
@@ -186,6 +188,7 @@ $companyName = getSetting('company_name', 'Company');
             <table class="report-summary-table">
                 <tr><td>Total Work Days</td><td><?= $summary['work_days'] ?></td></tr>
                 <tr><td>Days Present</td><td><?= $summary['present'] ?></td></tr>
+                <tr><td>&nbsp;&nbsp;&#8627; Proper Present (no late / single punch)</td><td><?= $summary['proper_present'] ?></td></tr>
                 <?php if ($summary['holiday_duty']>0): ?><tr><td>&nbsp;&nbsp;&#8627; of which Holiday/Weekend Duty</td><td><?= $summary['holiday_duty'] ?></td></tr><?php endif; ?>
                 <tr><td>Days Absent</td><td><?= $summary['absent'] ?></td></tr>
                 <?php if (in_array('pending',$filters)): ?><tr><td>Days Pending / No Data</td><td><?= $summary['pending'] ?></td></tr><?php endif; ?>

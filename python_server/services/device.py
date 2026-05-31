@@ -108,9 +108,22 @@ async def mark_command_delivered(command_id: int):
 
 
 async def acknowledge_command(command_id: int, result_code: int):
-    """Mark a command as acknowledged with its result code."""
+    """
+    Mark a command as acknowledged with its result code.
+    On SUCCESS (result_code == 0) for a SET_USER / SET_BIODATA command, also update
+    the device_employees tracking row so the dashboard sync status reflects reality.
+    """
+    import re
+
     async with get_db() as conn:
         async with conn.cursor() as cur:
+            # Fetch the command first so we know its type / target device / content.
+            await cur.execute(
+                "SELECT device_sn, command_type, command_content FROM device_commands WHERE id = %s",
+                (command_id,)
+            )
+            cmd = await cur.fetchone()
+
             status = "acknowledged" if result_code == 0 else "failed"
             await cur.execute(
                 """UPDATE device_commands 
@@ -118,6 +131,41 @@ async def acknowledge_command(command_id: int, result_code: int):
                    WHERE id = %s""",
                 (status, datetime.now(), result_code, command_id)
             )
+
+            # On success, reflect the sync into device_employees.
+            if cmd and result_code == 0 and cmd["command_type"] in ("SET_USER", "SET_BIODATA"):
+                device_sn = cmd["device_sn"]
+                content = cmd["command_content"] or ""
+                m = re.search(r"PIN=(\S+)", content)
+                if m:
+                    pin = m.group(1)
+                    now = datetime.now()
+                    if cmd["command_type"] == "SET_USER":
+                        await cur.execute(
+                            """INSERT INTO device_employees (device_sn, pin, user_synced, synced_at)
+                               VALUES (%s, %s, TRUE, %s)
+                               ON DUPLICATE KEY UPDATE user_synced = TRUE, synced_at = VALUES(synced_at)""",
+                            (device_sn, pin, now)
+                        )
+                    else:  # SET_BIODATA
+                        await cur.execute(
+                            """INSERT INTO device_employees (device_sn, pin, bio_synced, synced_at)
+                               VALUES (%s, %s, TRUE, %s)
+                               ON DUPLICATE KEY UPDATE bio_synced = TRUE, synced_at = VALUES(synced_at)""",
+                            (device_sn, pin, now)
+                        )
+                    logger.info(f"Sync tracked: {cmd['command_type']} PIN={pin} -> {device_sn}")
+
+            # On a successful DELETE_USER, remove the tracking row entirely.
+            if cmd and result_code == 0 and cmd["command_type"] == "DELETE_USER":
+                content = cmd["command_content"] or ""
+                m = re.search(r"PIN=(\S+)", content)
+                if m:
+                    await cur.execute(
+                        "DELETE FROM device_employees WHERE device_sn = %s AND pin = %s",
+                        (cmd["device_sn"], m.group(1))
+                    )
+                    logger.info(f"Sync tracked: DELETE_USER PIN={m.group(1)} -> {cmd['device_sn']}")
 
 
 async def get_all_stamps_for_device(device_sn: str) -> dict:
