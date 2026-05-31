@@ -9,13 +9,16 @@ $db = getDB();
 $employees = $db->query("SELECT id, pin, name FROM employees WHERE status = 'active' ORDER BY name")->fetchAll();
 $report = null; $employee = null; $summary = null;
 
-// Default filters (all checked on first load, empty array if form submitted with none checked)
+// Present and Absent are ALWAYS included. The checkboxes control the optional extras.
 $filters = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $filters = $_POST['filters'] ?? [];
 } else {
-    $filters = ['present','absent','late','on_leave','holiday','weekend','pending'];
+    $filters = ['late','on_leave','holiday','weekend','pending'];
 }
+// Force present + absent to always be included.
+if (!in_array('present', $filters)) $filters[] = 'present';
+if (!in_array('absent', $filters)) $filters[] = 'absent';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
     $pin = $_POST['pin'] ?? $_GET['pin'] ?? '';
@@ -131,10 +134,8 @@ $companyName = getSetting('company_name', 'Company');
                 </div>
             </div>
             <div class="form-group">
-                <label>Include in Report:</label>
+                <label>Also Include in Report:</label>
                 <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:6px">
-                    <label class="checkbox-label"><input type="checkbox" name="filters[]" value="present" <?= in_array('present',$filters)?'checked':'' ?>> Present</label>
-                    <label class="checkbox-label"><input type="checkbox" name="filters[]" value="absent" <?= in_array('absent',$filters)?'checked':'' ?>> Absent</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="late" <?= in_array('late',$filters)?'checked':'' ?>> Late</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="early" <?= in_array('early',$filters)?'checked':'' ?>> Early Leave</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="on_leave" <?= in_array('on_leave',$filters)?'checked':'' ?>> On Leave</label>
@@ -184,9 +185,9 @@ $companyName = getSetting('company_name', 'Company');
             <h4>SUMMARY</h4>
             <table class="report-summary-table">
                 <tr><td>Total Work Days</td><td><?= $summary['work_days'] ?></td></tr>
-                <?php if (in_array('present',$filters)): ?><tr><td>Days Present</td><td><?= $summary['present'] ?></td></tr><?php endif; ?>
-                <?php if (in_array('present',$filters) && $summary['holiday_duty']>0): ?><tr><td>&nbsp;&nbsp;&#8627; of which Holiday/Weekend Duty</td><td><?= $summary['holiday_duty'] ?></td></tr><?php endif; ?>
-                <?php if (in_array('absent',$filters)): ?><tr><td>Days Absent</td><td><?= $summary['absent'] ?></td></tr><?php endif; ?>
+                <tr><td>Days Present</td><td><?= $summary['present'] ?></td></tr>
+                <?php if ($summary['holiday_duty']>0): ?><tr><td>&nbsp;&nbsp;&#8627; of which Holiday/Weekend Duty</td><td><?= $summary['holiday_duty'] ?></td></tr><?php endif; ?>
+                <tr><td>Days Absent</td><td><?= $summary['absent'] ?></td></tr>
                 <?php if (in_array('pending',$filters)): ?><tr><td>Days Pending / No Data</td><td><?= $summary['pending'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('late',$filters)): ?><tr><td>Days Late</td><td><?= $summary['late'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('early',$filters)): ?><tr><td>Days Early Leave</td><td><?= $summary['early'] ?></td></tr><?php endif; ?>

@@ -1,2 +1,28 @@
 ** maybe not needed to sync every 5 seconds
-** employee report more modification and logic change... how its logic works
+** employee report more modification and logic change... 
+how its logic works
+
+** Features Old System Has That We DON'T
+Absent Hour threshold — punch after a cutoff (e.g. 11 AM) = absent, not just late
+Cumulative late penalty — 3 lates in a row → next day auto-absent
+Cumulative early penalty — same for early-outs
+Night shift processing — cross-midnight punch pairing
+Gender-based shift times — separate female hours
+Duty roster / work-group scheduling — rotating shifts per group
+Working hours + OT calculation — with rounding policies
+Breaktime deduction
+Inline holiday as absent — sandwiched holiday rule
+Early-in / late-out punch windows — punches outside the window ignored
+
+** Features We Have That Old System DOESN'T
+Pending status — never falsely marks absent when device was offline
+Self-healing reprocess queue — late-arriving data rebuilds automatically
+Worked-on-off-day flag — clean tracking of weekend/holiday duty
+Shift overrides — single govt-order change applies to everyone
+Locked records — manual adjustments protected from reprocessing
+Modern, fast architecture — pre-processed, indexed
+
+** Summary
+The old system is far more feature-rich in attendance policy (OT, night shifts, cumulative penalties, gender timing, duty rosters, working hours) — but it's slow, complex, and recalculates everything on every report view.
+
+Our new system is simpler and faster, with better data integrity (pending status, self-healing), but it deliberately drops: overtime, working hours, night shifts, cumulative penalties, and the absent-hour threshold.
