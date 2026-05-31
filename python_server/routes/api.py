@@ -27,6 +27,7 @@ from services.importer import (
     get_import_job,
     get_recent_imports,
 )
+from services.reprocess import enqueue_range, get_queued_dates, queue_size
 from services.device import get_device_by_sn
 
 logger = logging.getLogger(__name__)
@@ -219,3 +220,65 @@ async def api_process_attendance(req: ProcessAttendanceRequest):
     else:
         result = await process_date(target_date)
         return {"success": True, "result": result}
+
+
+# =============================================================================
+# BACKFILL / RECOVERY
+# =============================================================================
+class BackfillRequest(BaseModel):
+    from_date: str            # YYYY-MM-DD
+    to_date: str              # YYYY-MM-DD
+    device_sn: Optional[str] = None   # if given, also pull that device's ATTLOG
+
+
+@router.post("/attendance/backfill")
+async def api_attendance_backfill(req: BackfillRequest):
+    """
+    Recover missed data for a date range:
+      * marks every date in the range for reprocessing (dirty-date queue), and
+      * optionally queues a QUERY_ATTLOG pull from a specific device so it
+        re-sends any logs it buffered while offline.
+    The processor drains the queue automatically; raw inserts are idempotent.
+    """
+    from datetime import date as date_type
+    try:
+        start = date_type.fromisoformat(req.from_date)
+        end = date_type.fromisoformat(req.to_date)
+    except ValueError:
+        raise HTTPException(400, "Invalid date format. Use YYYY-MM-DD.")
+
+    pulled = False
+    if req.device_sn:
+        device = await get_device_by_sn(req.device_sn)
+        if not device or device["status"] != "approved":
+            raise HTTPException(400, "Device not found or not approved")
+        await queue_query_attlog_command(req.device_sn)
+        pulled = True
+
+    enqueued = await enqueue_range(start, end, reason="manual_backfill")
+    return {
+        "success": True,
+        "dates_queued": enqueued,
+        "attlog_pull_queued": pulled,
+        "message": f"{enqueued} date(s) queued for reprocessing"
+                   + (" + ATTLOG pull requested" if pulled else ""),
+    }
+
+
+@router.get("/attendance/reprocess-queue")
+async def api_reprocess_queue():
+    """Show the dirty-date reprocessing backlog (for dashboards / debugging)."""
+    size = await queue_size()
+    dates = await get_queued_dates(limit=100)
+    return {
+        "success": True,
+        "size": size,
+        "dates": [
+            {
+                "date": str(d["target_date"]),
+                "reason": d["reason"],
+                "enqueued_at": str(d["enqueued_at"]),
+            }
+            for d in dates
+        ],
+    }

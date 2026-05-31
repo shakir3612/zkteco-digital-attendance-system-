@@ -10,7 +10,7 @@ Or started as background task in main.py
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from database import get_db, init_db_pool, close_db_pool
 
 logger = logging.getLogger(__name__)
@@ -162,6 +162,46 @@ async def check_device_status():
                         )
                     )
                     logger.info(f"Device BACK ONLINE: {device_name} (SN={sn})")
+
+                    # --- AUTOMATIC BACKFILL ON RECONNECT ---
+                    # The device may have buffered punches while offline. Pull its
+                    # attendance log (idempotent via INSERT IGNORE) and mark the dates
+                    # it was missing as dirty so they get rebuilt once data lands.
+                    await trigger_reconnect_backfill(sn, device.get("last_seen"))
+
+
+async def trigger_reconnect_backfill(device_sn: str, last_seen):
+    """
+    On device reconnect, queue a recovery ATTLOG pull and enqueue the offline
+    date range for reprocessing. Guarded so we don't pile up duplicate QUERY_ATTLOG
+    commands if the device flaps.
+    """
+    from services.command import queue_query_attlog_command
+    from services.reprocess import enqueue_range
+
+    # Don't queue another pull if one is already waiting/delivered.
+    async with get_db() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """SELECT COUNT(*) AS cnt FROM device_commands
+                   WHERE device_sn = %s AND command_type = 'QUERY_ATTLOG'
+                   AND status IN ('pending', 'delivered')""",
+                (device_sn,)
+            )
+            row = await cur.fetchone()
+            if row and row["cnt"] > 0:
+                return
+
+    await queue_query_attlog_command(device_sn)
+
+    # Enqueue the dates spanning the outage (last_seen .. today) for reprocessing.
+    today = date.today()
+    start = last_seen.date() if last_seen else today
+    enqueued = await enqueue_range(start, today, reason=f"reconnect:{device_sn}")
+    logger.info(
+        f"Reconnect backfill for {device_sn}: QUERY_ATTLOG queued, "
+        f"{enqueued} date(s) marked for reprocessing ({start} .. {today})"
+    )
 
 
 async def main():

@@ -3,8 +3,8 @@ Attendance Service - parses and stores raw attendance logs from devices.
 """
 
 import logging
-from datetime import datetime
-from typing import List, Tuple
+from datetime import datetime, date
+from typing import List, Tuple, Set
 from database import get_db
 
 logger = logging.getLogger(__name__)
@@ -46,17 +46,22 @@ def parse_attlog_line(line: str) -> dict:
         return None
 
 
-async def store_attendance_records(device_sn: str, records: List[dict]) -> Tuple[int, int]:
+async def store_attendance_records(device_sn: str, records: List[dict]) -> Tuple[int, int, Set[date]]:
     """
     Store parsed attendance records into attendance_raw table.
     Uses INSERT IGNORE to handle duplicates gracefully.
-    Returns (inserted_count, skipped_count).
+    Returns (inserted_count, skipped_count, affected_dates).
+
+    `affected_dates` is the set of calendar dates for which at least one NEW raw
+    punch was inserted. These dates are what the caller enqueues for reprocessing,
+    so backfilled data (e.g. from a device that was offline for days) is rebuilt.
     """
     if not records:
-        return 0, 0
+        return 0, 0, set()
 
     inserted = 0
     skipped = 0
+    affected_dates: Set[date] = set()
 
     async with get_db() as conn:
         async with conn.cursor() as cur:
@@ -81,6 +86,8 @@ async def store_attendance_records(device_sn: str, records: List[dict]) -> Tuple
                     )
                     if cur.rowcount > 0:
                         inserted += 1
+                        # Track the date of every newly-stored punch so it gets reprocessed.
+                        affected_dates.add(record["punch_time"].date())
                     else:
                         skipped += 1
                 except Exception as e:
@@ -89,16 +96,17 @@ async def store_attendance_records(device_sn: str, records: List[dict]) -> Tuple
 
     logger.info(
         f"Attendance stored for device {device_sn}: "
-        f"{inserted} inserted, {skipped} skipped/duplicates"
+        f"{inserted} inserted, {skipped} skipped/duplicates, "
+        f"{len(affected_dates)} date(s) affected"
     )
-    return inserted, skipped
+    return inserted, skipped, affected_dates
 
 
-async def process_attlog_body(device_sn: str, body: str) -> Tuple[int, int]:
+async def process_attlog_body(device_sn: str, body: str) -> Tuple[int, int, Set[date]]:
     """
     Process the full ATTLOG POST body from a device.
     Parses all lines and stores valid records.
-    Returns (inserted_count, skipped_count).
+    Returns (inserted_count, skipped_count, affected_dates).
     """
     lines = body.strip().split("\n")
     records = []

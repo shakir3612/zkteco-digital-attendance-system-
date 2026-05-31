@@ -47,6 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && 
             SUM(CASE WHEN ad.was_late=1 THEN 1 ELSE 0 END) as days_late,
             SUM(CASE WHEN ad.left_early=1 THEN 1 ELSE 0 END) as days_early,
             SUM(CASE WHEN ad.status='absent' THEN 1 ELSE 0 END) as days_absent,
+            SUM(CASE WHEN ad.status='pending' THEN 1 ELSE 0 END) as days_pending,
+            SUM(CASE WHEN ad.worked_on_off_day=1 THEN 1 ELSE 0 END) as days_duty,
             SUM(CASE WHEN ad.status='on_leave' THEN 1 ELSE 0 END) as days_leave,
             SUM(CASE WHEN ad.status='holiday' THEN 1 ELSE 0 END) as days_holiday,
             SUM(CASE WHEN ad.status='weekend' THEN 1 ELSE 0 END) as days_weekend,
@@ -70,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['save_template']) && 
 <div class="form-group"><label>Grade</label><select name="grade_id"><option value="">All</option><?php foreach($departments as $d):?><option value="<?=$d['id']?>"><?=htmlspecialchars($d['name'])?></option><?php endforeach;?></select></div>
 </div>
 <div class="form-group"><label>Columns</label><div style="display:flex;flex-wrap:wrap;gap:12px">
-<?php $cols = ['pin'=>'PIN','name'=>'Name','grade'=>'Grade','designation'=>'Designation','shift'=>'Shift','work_days'=>'Work Days','present'=>'Present','late'=>'Late','early'=>'Early Leave','absent'=>'Absent','leave'=>'On Leave','holiday'=>'Holiday','weekend'=>'Weekend','hours'=>'Total Hours','late_min'=>'Late Minutes','early_min'=>'Early Minutes'];
+<?php $cols = ['pin'=>'PIN','name'=>'Name','grade'=>'Grade','designation'=>'Designation','shift'=>'Shift','work_days'=>'Work Days','present'=>'Present','duty'=>'Holiday/Weekend Duty','late'=>'Late','early'=>'Early Leave','absent'=>'Absent','pending'=>'Pending/No Data','leave'=>'On Leave','holiday'=>'Holiday','weekend'=>'Weekend','hours'=>'Total Hours','late_min'=>'Late Minutes','early_min'=>'Early Minutes'];
 foreach($cols as $k=>$v): ?><label class="checkbox-label"><input type="checkbox" name="columns[]" value="<?=$k?>" checked><?=$v?></label><?php endforeach; ?>
 </div></div>
 <div class="form-group"><label>Grouping</label><select name="grouping"><option value="summary">One row per employee (summary)</option><option value="detailed">One row per day (detailed)</option></select></div>
@@ -99,9 +101,9 @@ if (isset($_POST['export']) && $_POST['export'] === 'csv') {
     header('Content-Disposition: attachment; filename="attendance_report_' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     if ($report['type'] === 'summary') {
-        fputcsv($out, ['PIN','Name','Grade','Work Days','Present','Late','Early','Absent','Leave','Hours','Late Min','Early Min']);
+        fputcsv($out, ['PIN','Name','Grade','Work Days','Present','Duty','Late','Early','Absent','Pending','Leave','Hours','Late Min','Early Min']);
         foreach ($report['rows'] as $r) {
-            fputcsv($out, [$r['pin'],$r['emp_name'],$r['grade_name']??'',$r['work_days'],$r['days_present'],$r['days_late'],$r['days_early'],$r['days_absent'],$r['days_leave'],$r['total_hours'],$r['total_late_min'],$r['total_early_min']]);
+            fputcsv($out, [$r['pin'],$r['emp_name'],$r['grade_name']??'',$r['work_days'],$r['days_present'],$r['days_duty'],$r['days_late'],$r['days_early'],$r['days_absent'],$r['days_pending'],$r['days_leave'],$r['total_hours'],$r['total_late_min'],$r['total_early_min']]);
         }
     } else {
         fputcsv($out, ['Date','PIN','Name','In','Out','Hours','Status','Late','Early']);
@@ -140,9 +142,11 @@ if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
 <?php if(in_array('grade',$report['columns'])):?><th>Grade</th><?php endif;?>
 <?php if(in_array('work_days',$report['columns'])):?><th>Work Days</th><?php endif;?>
 <?php if(in_array('present',$report['columns'])):?><th>Present</th><?php endif;?>
+<?php if(in_array('duty',$report['columns'])):?><th>Duty</th><?php endif;?>
 <?php if(in_array('late',$report['columns'])):?><th>Late</th><?php endif;?>
 <?php if(in_array('early',$report['columns'])):?><th>Early</th><?php endif;?>
 <?php if(in_array('absent',$report['columns'])):?><th>Absent</th><?php endif;?>
+<?php if(in_array('pending',$report['columns'])):?><th>Pending</th><?php endif;?>
 <?php if(in_array('leave',$report['columns'])):?><th>Leave</th><?php endif;?>
 <?php if(in_array('hours',$report['columns'])):?><th>Hours</th><?php endif;?>
 <?php if(in_array('late_min',$report['columns'])):?><th>Late Min</th><?php endif;?>
@@ -158,9 +162,11 @@ if (isset($_POST['save_template']) && !empty($_POST['template_name'])) {
 <?php if(in_array('grade',$report['columns'])):?><td><?=htmlspecialchars($r['grade_name']??'—')?></td><?php endif;?>
 <?php if(in_array('work_days',$report['columns'])):?><td><?=$r['work_days']?></td><?php endif;?>
 <?php if(in_array('present',$report['columns'])):?><td><?=$r['days_present']?></td><?php endif;?>
+<?php if(in_array('duty',$report['columns'])):?><td><?=$r['days_duty']?></td><?php endif;?>
 <?php if(in_array('late',$report['columns'])):?><td><?=$r['days_late']?></td><?php endif;?>
 <?php if(in_array('early',$report['columns'])):?><td><?=$r['days_early']?></td><?php endif;?>
 <?php if(in_array('absent',$report['columns'])):?><td><?=$r['days_absent']?></td><?php endif;?>
+<?php if(in_array('pending',$report['columns'])):?><td><?=$r['days_pending']?></td><?php endif;?>
 <?php if(in_array('leave',$report['columns'])):?><td><?=$r['days_leave']?></td><?php endif;?>
 <?php if(in_array('hours',$report['columns'])):?><td><?=number_format($r['total_hours'],1)?></td><?php endif;?>
 <?php if(in_array('late_min',$report['columns'])):?><td><?=$r['total_late_min']?></td><?php endif;?>

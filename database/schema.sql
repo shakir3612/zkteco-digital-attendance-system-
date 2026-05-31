@@ -190,7 +190,17 @@ CREATE TABLE attendance_daily (
     first_in DATETIME,
     last_out DATETIME,
     total_hours DECIMAL(5,2),
-    status ENUM('present','absent','on_leave','holiday','weekend') DEFAULT 'absent',
+    -- 'pending' = a working day with no punches whose data is NOT yet known-complete
+    -- (device was offline / server received nothing that day). Never asserted as 'absent'.
+    status ENUM('present','absent','on_leave','holiday','weekend','pending') DEFAULT 'absent',
+    -- Calendar nature of the day, independent of attendance outcome.
+    day_type ENUM('working','weekend','holiday') NOT NULL DEFAULT 'working',
+    -- TRUE when the employee punched on a holiday/weekend (counted as duty/present).
+    worked_on_off_day BOOLEAN NOT NULL DEFAULT FALSE,
+    -- TRUE when status='pending' (data not yet complete). Convenience flag for queries.
+    is_pending BOOLEAN NOT NULL DEFAULT FALSE,
+    -- TRUE when an admin manually adjusted this row; the reprocessor will NOT overwrite it.
+    locked BOOLEAN NOT NULL DEFAULT FALSE,
     was_late BOOLEAN DEFAULT FALSE,
     late_minutes INT DEFAULT 0,
     left_early BOOLEAN DEFAULT FALSE,
@@ -201,7 +211,23 @@ CREATE TABLE attendance_daily (
     processed_at DATETIME,
     UNIQUE KEY unique_daily (pin, date),
     INDEX idx_date (date),
-    INDEX idx_employee (employee_id, date)
+    INDEX idx_employee (employee_id, date),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================================================
+-- ATTENDANCE REPROCESS QUEUE
+-- Dirty-date queue: whenever raw punches are inserted/backfilled for a date,
+-- that date is enqueued here so the processor rebuilds it (regardless of age).
+-- This is what makes late-arriving data (device offline for days) self-heal.
+-- =============================================================================
+CREATE TABLE attendance_reprocess_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    target_date DATE NOT NULL,
+    reason VARCHAR(100),
+    enqueued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_date (target_date),
+    INDEX idx_enqueued (enqueued_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- =============================================================================

@@ -14,7 +14,7 @@ $filters = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $filters = $_POST['filters'] ?? [];
 } else {
-    $filters = ['present','absent','late','on_leave','holiday','weekend'];
+    $filters = ['present','absent','late','on_leave','holiday','weekend','pending'];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
@@ -34,21 +34,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['pin'])) {
             $stmt->execute([$pin, $fromDate, $toDate]);
             $records = $stmt->fetchAll();
 
-            $summary = ['work_days'=>0,'present'=>0,'absent'=>0,'late'=>0,'early'=>0,'leave'=>0,'holiday'=>0,'weekend'=>0,'single_punch'=>0,'total_hours'=>0,'late_min'=>0,'early_min'=>0];
-            foreach ($records as $r) {
-                if ($r['status']==='present') {
-                    $summary['present']++; $summary['work_days']++;
-                    if($r['was_late']){$summary['late']++;$summary['late_min']+=$r['late_minutes'];}
-                    if($r['left_early']){$summary['early']++;$summary['early_min']+=$r['early_minutes'];}
-                    if($r['single_punch'])$summary['single_punch']++;
-                    if($r['total_hours'])$summary['total_hours']+=$r['total_hours'];
+            // Calendar context so we can label days that have NO processed row yet.
+            $hstmt = $db->prepare("SELECT date, name FROM holidays WHERE date BETWEEN ? AND ?");
+            $hstmt->execute([$fromDate, $toDate]);
+            $holidayMap = [];
+            foreach ($hstmt->fetchAll() as $h) { $holidayMap[$h['date']] = $h['name']; }
+            $weeklyOff = array_map('trim', explode(',', strtolower(getSetting('weekly_off_days', 'fri,sat'))));
+            $dowMap = [1=>'mon',2=>'tue',3=>'wed',4=>'thu',5=>'fri',6=>'sat',7=>'sun']; // ISO-8601 (N)
+
+            // Index processed rows by date.
+            $byDate = [];
+            foreach ($records as $r) { $byDate[$r['date']] = $r; }
+
+            // Build a UNIFIED list with one entry per calendar day in the range.
+            // A day with no processed row is NOT silently dropped: working days become
+            // 'unprocessed' (counted as pending / no-data), off days are labelled from
+            // the calendar. This is what prevents a connectivity gap from hiding days.
+            $days = [];
+            $cursor = new DateTime($fromDate);
+            $endDt = new DateTime($toDate);
+            while ($cursor <= $endDt) {
+                $ds = $cursor->format('Y-m-d');
+                if (isset($byDate[$ds])) {
+                    $row = $byDate[$ds];
+                    $row['is_synthetic'] = false;
+                    $days[] = $row;
+                } else {
+                    $dow = $dowMap[(int)$cursor->format('N')];
+                    if (isset($holidayMap[$ds]))      { $st = 'holiday';      $dt = 'holiday'; }
+                    elseif (in_array($dow, $weeklyOff)) { $st = 'weekend';      $dt = 'weekend'; }
+                    else                                { $st = 'unprocessed';  $dt = 'working'; }
+                    $days[] = [
+                        'date'=>$ds, 'status'=>$st, 'day_type'=>$dt,
+                        'first_in'=>null, 'last_out'=>null, 'total_hours'=>null,
+                        'was_late'=>0, 'left_early'=>0, 'late_minutes'=>0, 'early_minutes'=>0,
+                        'single_punch'=>0, 'worked_on_off_day'=>0,
+                        'is_pending'=>($st === 'unprocessed' ? 1 : 0), 'is_synthetic'=>true,
+                    ];
                 }
-                elseif ($r['status']==='absent') { $summary['absent']++; $summary['work_days']++; }
-                elseif ($r['status']==='on_leave') $summary['leave']++;
-                elseif ($r['status']==='holiday') $summary['holiday']++;
-                elseif ($r['status']==='weekend') $summary['weekend']++;
+                $cursor->modify('+1 day');
             }
-            $report = ['records'=>$records,'shift'=>$shift,'from'=>$fromDate,'to'=>$toDate];
+
+            // Summary. NOTE: work_days = present + absent only; 'pending'/'unprocessed'
+            // days are NOT counted as absent (we don't yet trust the data is complete).
+            // Holiday/weekend duty (worked_on_off_day) counts as present.
+            $summary = ['work_days'=>0,'present'=>0,'absent'=>0,'late'=>0,'early'=>0,'leave'=>0,
+                        'holiday'=>0,'weekend'=>0,'single_punch'=>0,'pending'=>0,'holiday_duty'=>0,
+                        'late_min'=>0,'early_min'=>0];
+            foreach ($days as $r) {
+                switch ($r['status']) {
+                    case 'present':
+                        $summary['present']++; $summary['work_days']++;
+                        if (!empty($r['worked_on_off_day'])) $summary['holiday_duty']++;
+                        if (!empty($r['was_late']))  { $summary['late']++;  $summary['late_min']  += $r['late_minutes']; }
+                        if (!empty($r['left_early'])){ $summary['early']++; $summary['early_min'] += $r['early_minutes']; }
+                        if (!empty($r['single_punch'])) $summary['single_punch']++;
+                        break;
+                    case 'absent':       $summary['absent']++; $summary['work_days']++; break;
+                    case 'on_leave':     $summary['leave']++;   break;
+                    case 'holiday':      $summary['holiday']++; break;
+                    case 'weekend':      $summary['weekend']++; break;
+                    case 'pending':
+                    case 'unprocessed':  $summary['pending']++; break;
+                }
+            }
+            $report = ['days'=>$days,'shift'=>$shift,'from'=>$fromDate,'to'=>$toDate];
         }
     }
 }
@@ -91,7 +141,7 @@ $companyName = getSetting('company_name', 'Company');
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="holiday" <?= in_array('holiday',$filters)?'checked':'' ?>> Holiday</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="weekend" <?= in_array('weekend',$filters)?'checked':'' ?>> Weekend</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="single_punch" <?= in_array('single_punch',$filters)?'checked':'' ?>> Single Punch</label>
-                    <label class="checkbox-label"><input type="checkbox" name="filters[]" value="total_hours" <?= in_array('total_hours',$filters)?'checked':'' ?>> Total Hours</label>
+                    <label class="checkbox-label"><input type="checkbox" name="filters[]" value="pending" <?= in_array('pending',$filters)?'checked':'' ?>> Pending / No Data</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="total_late" <?= in_array('total_late',$filters)?'checked':'' ?>> Total Late Min</label>
                     <label class="checkbox-label"><input type="checkbox" name="filters[]" value="total_early" <?= in_array('total_early',$filters)?'checked':'' ?>> Total Early Min</label>
                 </div>
@@ -135,7 +185,9 @@ $companyName = getSetting('company_name', 'Company');
             <table class="report-summary-table">
                 <tr><td>Total Work Days</td><td><?= $summary['work_days'] ?></td></tr>
                 <?php if (in_array('present',$filters)): ?><tr><td>Days Present</td><td><?= $summary['present'] ?></td></tr><?php endif; ?>
+                <?php if (in_array('present',$filters) && $summary['holiday_duty']>0): ?><tr><td>&nbsp;&nbsp;&#8627; of which Holiday/Weekend Duty</td><td><?= $summary['holiday_duty'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('absent',$filters)): ?><tr><td>Days Absent</td><td><?= $summary['absent'] ?></td></tr><?php endif; ?>
+                <?php if (in_array('pending',$filters)): ?><tr><td>Days Pending / No Data</td><td><?= $summary['pending'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('late',$filters)): ?><tr><td>Days Late</td><td><?= $summary['late'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('early',$filters)): ?><tr><td>Days Early Leave</td><td><?= $summary['early'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('on_leave',$filters)): ?><tr><td>Days On Leave</td><td><?= $summary['leave'] ?></td></tr><?php endif; ?>
@@ -144,8 +196,10 @@ $companyName = getSetting('company_name', 'Company');
                 <?php if (in_array('single_punch',$filters)): ?><tr><td>Single Punch Days</td><td><?= $summary['single_punch'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('total_late',$filters)): ?><tr><td>Total Late Minutes</td><td><?= $summary['late_min'] ?></td></tr><?php endif; ?>
                 <?php if (in_array('total_early',$filters)): ?><tr><td>Total Early Minutes</td><td><?= $summary['early_min'] ?></td></tr><?php endif; ?>
-                <?php if (in_array('total_hours',$filters)): ?><tr><td>Total Hours Worked</td><td><?= number_format($summary['total_hours'],1) ?></td></tr><?php endif; ?>
             </table>
+            <?php if ($summary['pending']>0): ?>
+            <p class="report-pending-note">&#9888; <?= $summary['pending'] ?> day(s) have no confirmed data yet (device offline or not yet processed). These are shown as <strong>Pending</strong> and are <strong>not</strong> counted as absent.</p>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -162,35 +216,43 @@ $companyName = getSetting('company_name', 'Company');
                     <th>Day</th>
                     <th>In</th>
                     <th>Out</th>
-                    <th>Hours</th>
                     <th>Status</th>
                     <th>Flags</th>
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($report['records'] as $r):
-                // Filter logic
+            <?php foreach ($report['days'] as $r):
+                $st = $r['status'];
+                $isPendingRow = ($st === 'pending' || $st === 'unprocessed');
+                // Filter logic (which rows to display)
                 $show = false;
-                if ($r['status']==='present' && in_array('present',$filters)) $show = true;
-                if ($r['status']==='present' && $r['was_late'] && in_array('late',$filters)) $show = true;
-                if ($r['status']==='present' && $r['left_early'] && in_array('early',$filters)) $show = true;
-                if ($r['status']==='absent' && in_array('absent',$filters)) $show = true;
-                if ($r['status']==='on_leave' && in_array('on_leave',$filters)) $show = true;
-                if ($r['status']==='holiday' && in_array('holiday',$filters)) $show = true;
-                if ($r['status']==='weekend' && in_array('weekend',$filters)) $show = true;
+                if ($st==='present' && in_array('present',$filters)) $show = true;
+                if ($st==='present' && !empty($r['was_late']) && in_array('late',$filters)) $show = true;
+                if ($st==='present' && !empty($r['left_early']) && in_array('early',$filters)) $show = true;
+                if ($st==='absent' && in_array('absent',$filters)) $show = true;
+                if ($st==='on_leave' && in_array('on_leave',$filters)) $show = true;
+                if ($st==='holiday' && in_array('holiday',$filters)) $show = true;
+                if ($st==='weekend' && in_array('weekend',$filters)) $show = true;
+                if ($isPendingRow && in_array('pending',$filters)) $show = true;
                 if (!$show) continue;
+
+                // Display label
+                if ($isPendingRow) { $label = 'Pending / No data'; }
+                elseif ($st==='present' && !empty($r['worked_on_off_day'])) { $label = 'Present ('.ucfirst($r['day_type']).' Duty)'; }
+                else { $label = ucfirst(str_replace('_',' ',$st)); }
+                $rowClass = 'status-row-'.($isPendingRow ? 'pending' : $st);
             ?>
-                <tr class="status-row-<?= $r['status'] ?><?= $r['was_late']?' row-late':'' ?><?= $r['left_early']?' row-early':'' ?>">
+                <tr class="<?= $rowClass ?><?= !empty($r['was_late'])?' row-late':'' ?><?= !empty($r['left_early'])?' row-early':'' ?>">
                     <td><?= date('d M',strtotime($r['date'])) ?></td>
                     <td><?= date('D',strtotime($r['date'])) ?></td>
                     <td><?= $r['first_in']?date('H:i',strtotime($r['first_in'])):'—' ?></td>
                     <td><?= $r['last_out']?date('H:i',strtotime($r['last_out'])):'—' ?></td>
-                    <td><?= $r['total_hours']!==null?number_format($r['total_hours'],1):'—' ?></td>
-                    <td><?= ucfirst(str_replace('_',' ',$r['status'])) ?></td>
+                    <td><?= htmlspecialchars($label) ?></td>
                     <td>
-                        <?php if($r['was_late']):?>Late(<?=$r['late_minutes']?>m) <?php endif;?>
-                        <?php if($r['left_early']):?>Early(<?=$r['early_minutes']?>m) <?php endif;?>
-                        <?php if($r['single_punch']):?>1-punch <?php endif;?>
+                        <?php if(!empty($r['worked_on_off_day'])):?><?= ucfirst($r['day_type']) ?> duty <?php endif;?>
+                        <?php if(!empty($r['was_late'])):?>Late(<?=$r['late_minutes']?>m) <?php endif;?>
+                        <?php if(!empty($r['left_early'])):?>Early(<?=$r['early_minutes']?>m) <?php endif;?>
+                        <?php if(!empty($r['single_punch'])):?>1-punch <?php endif;?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -233,8 +295,10 @@ $companyName = getSetting('company_name', 'Company');
 .status-row-on_leave td { background: #fefce8; }
 .status-row-holiday td { background: #f0fdf4; }
 .status-row-weekend td { background: #f8fafc; color: var(--gray-400); }
+.status-row-pending td { background: #fff7ed; color: var(--gray-600); font-style: italic; }
 .row-late td { border-left: 3px solid var(--warning); }
 .row-early td { border-left: 3px solid var(--info); }
+.report-pending-note { margin-top: 14px; font-size: 12px; color: #b45309; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 8px 12px; }
 
 /* Print styles */
 @media print {

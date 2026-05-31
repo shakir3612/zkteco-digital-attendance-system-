@@ -147,10 +147,11 @@ $stmt->execute($params);
 $records = $stmt->fetchAll();
 
 // Summary stats
-$summary = ['present' => 0, 'absent' => 0, 'late' => 0, 'early' => 0, 'leave' => 0, 'holiday' => 0, 'weekend' => 0, 'single' => 0];
+$summary = ['present' => 0, 'absent' => 0, 'late' => 0, 'early' => 0, 'leave' => 0, 'holiday' => 0, 'weekend' => 0, 'single' => 0, 'pending' => 0, 'duty' => 0];
 foreach ($records as $r) {
-    if ($r['status'] === 'present') { $summary['present']++; if ($r['was_late']) $summary['late']++; if ($r['left_early']) $summary['early']++; if ($r['single_punch']) $summary['single']++; }
+    if ($r['status'] === 'present') { $summary['present']++; if ($r['was_late']) $summary['late']++; if ($r['left_early']) $summary['early']++; if ($r['single_punch']) $summary['single']++; if (!empty($r['worked_on_off_day'])) $summary['duty']++; }
     elseif ($r['status'] === 'absent') $summary['absent']++;
+    elseif ($r['status'] === 'pending') $summary['pending']++;
     elseif ($r['status'] === 'on_leave') $summary['leave']++;
     elseif ($r['status'] === 'holiday') $summary['holiday']++;
     elseif ($r['status'] === 'weekend') $summary['weekend']++;
@@ -183,6 +184,7 @@ $processedCount = $stmt2->fetch()['cnt'];
                 <option value="early_leave" <?= $statusFilter === 'early_leave' ? 'selected' : '' ?>>Early Leave</option>
                 <option value="single_punch" <?= $statusFilter === 'single_punch' ? 'selected' : '' ?>>Single Punch</option>
                 <option value="on_leave" <?= $statusFilter === 'on_leave' ? 'selected' : '' ?>>On Leave</option>
+                <option value="pending" <?= $statusFilter === 'pending' ? 'selected' : '' ?>>Pending / No Data</option>
             </select>
             <button type="submit" class="btn btn-primary btn-sm">View</button>
             <a href="?date=<?= date('Y-m-d', strtotime($selectedDate . ' -1 day')) ?>" class="btn btn-outline btn-sm">&larr; Prev</a>
@@ -262,6 +264,7 @@ $processedCount = $stmt2->fetch()['cnt'];
 <div class="stats-grid">
     <div class="stat-card"><div class="stat-value"><?= $summary['present'] ?></div><div class="stat-label">Present</div></div>
     <div class="stat-card"><div class="stat-value"><?= $summary['absent'] ?></div><div class="stat-label">Absent</div></div>
+    <div class="stat-card"><div class="stat-value"><?= $summary['pending'] ?></div><div class="stat-label">Pending / No Data</div></div>
     <div class="stat-card"><div class="stat-value"><?= $summary['late'] ?></div><div class="stat-label">Late</div></div>
     <div class="stat-card"><div class="stat-value"><?= $summary['early'] ?></div><div class="stat-label">Early Leave</div></div>
     <div class="stat-card"><div class="stat-value"><?= $summary['single'] ?></div><div class="stat-label">Single Punch</div></div>
@@ -302,8 +305,18 @@ $processedCount = $stmt2->fetch()['cnt'];
                     <td><?= $r['first_in'] ? date('H:i', strtotime($r['first_in'])) : '—' ?></td>
                     <td><?= $r['last_out'] ? date('H:i', strtotime($r['last_out'])) : ($r['single_punch'] ? '<span class="text-muted">single</span>' : '—') ?></td>
                     <td><?= $r['total_hours'] !== null ? number_format($r['total_hours'], 1) . 'h' : '—' ?></td>
-                    <td><span class="badge badge-<?= $r['status'] === 'present' ? 'approved' : ($r['status'] === 'absent' ? 'rejected' : 'suspended') ?>"><?= $r['status'] ?></span></td>
                     <td>
+                        <?php
+                            $badgeClass = 'suspended';
+                            if ($r['status'] === 'present') $badgeClass = 'approved';
+                            elseif ($r['status'] === 'absent') $badgeClass = 'rejected';
+                            elseif ($r['status'] === 'pending') $badgeClass = 'pending_approval';
+                            $statusLabel = $r['status'] === 'pending' ? 'pending / no data' : $r['status'];
+                        ?>
+                        <span class="badge badge-<?= $badgeClass ?>"><?= htmlspecialchars($statusLabel) ?></span>
+                    </td>
+                    <td>
+                        <?php if (!empty($r['worked_on_off_day'])): ?><span class="badge badge-approved"><?= ucfirst($r['day_type']) ?> duty</span> <?php endif; ?>
                         <?php if ($r['was_late']): ?><span class="badge badge-pending_approval">Late <?= $r['late_minutes'] ?>m</span> <?php endif; ?>
                         <?php if ($r['left_early']): ?><span class="badge badge-suspended">Early <?= $r['early_minutes'] ?>m</span> <?php endif; ?>
                         <?php if ($r['single_punch']): ?><span class="badge badge-inactive">1 punch</span> <?php endif; ?>

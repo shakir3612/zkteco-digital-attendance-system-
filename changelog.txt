@@ -210,3 +210,102 @@ Changes made - Session 4 (2026-05-30)
 26. VERSION BUMP TO v1.2.0
     - Updated README.md with new features
     - File: README.md
+
+
+
+=================================================
+Changes made - Session 5 (2026-05-31)
+=================================================
+
+27. MISSED / UNPROCESSED DATA RECOVERY (Self-Healing Attendance)
+    Problem: if a device lost connectivity for some days, those punches arrived late
+    (or not at all), and the processor only ever rebuilt "today" - so previous days
+    were frozen, late data was never summarised, and missing days silently vanished
+    from reports (or worse, looked like absences).
+
+    a) DIRTY-DATE REPROCESSING QUEUE (the core fix)
+       - New table: attendance_reprocess_queue (one row per calendar date that needs
+         rebuilding). New service: python_server/services/reprocess.py.
+       - Whenever NEW raw punches are stored (including backfill that arrives days
+         later), the affected dates are enqueued. The processor drains the queue every
+         cycle and rebuilds exactly those dates - no matter how old. attendance_daily
+         is treated as a rebuildable cache (idempotent ON DUPLICATE KEY UPDATE), so
+         reprocessing any date any number of times is safe.
+       - Files: python_server/services/reprocess.py (new),
+                python_server/services/attendance.py (store now returns affected dates),
+                python_server/routes/iclock.py (enqueues dates on ATTLOG push),
+                python_server/workers/attendance_processor.py.
+
+    b) PROCESSOR WORKER LOOP CHANGED
+       - Old: process "today" only, every 5 min.
+       - New: drain the dirty-date queue (handles arbitrarily old backfill) + a trailing
+         sweep of TODAY and YESTERDAY every 2 min (handles the live edge / midnight
+         rollover / late same-day punches).
+       - File: python_server/workers/attendance_processor.py.
+
+    c) PENDING vs ABSENT (no more false absences during an outage)
+       - New status 'pending' and column is_pending on attendance_daily.
+       - A working day with no punches is marked 'absent' ONLY if the day is "settled"
+         (date is in the past AND the server received data that day). If the server got
+         nothing that day (total outage / server down), the day is 'pending' - never a
+         fabricated absence.
+       - File: python_server/workers/attendance_processor.py (day_has_coverage()).
+
+    d) HOLIDAY / WEEKEND OFFICE DUTY IS NOW COUNTED
+       - New columns: day_type ENUM('working','weekend','holiday') and worked_on_off_day.
+       - If an employee punches on a holiday/weekend, it is recorded and counted as
+         present duty (worked_on_off_day = TRUE) instead of being discarded. Days off
+         with no punches still read 'holiday' / 'weekend'.
+       - Late/early are NOT applied to off-day duty (special-duty hours differ).
+       - File: python_server/workers/attendance_processor.py.
+
+    e) DEVICE-CURSOR (STAMP) FIX - enables automatic backfill
+       - ATTLOG/BIODATA stamp is now stored VERBATIM as the device sent it (matching the
+         OPERLOG handler). Previously it was synthesised as "old + inserted", which
+         desynchronised the device's sync cursor and could make it skip/re-send records
+         on reconnect - the exact thing that broke catch-up after an outage.
+       - File: python_server/routes/iclock.py.
+
+    f) AUTOMATIC BACKFILL ON DEVICE RECONNECT
+       - When an approved device comes back online after being offline, the monitor now
+         queues a one-shot QUERY_ATTLOG pull (deduplicated) and marks the outage date
+         range (last_seen .. today) for reprocessing.
+       - File: python_server/workers/device_monitor.py.
+
+    g) MANUAL RECOVERY / VISIBILITY API
+       - POST /api/attendance/backfill { from_date, to_date, device_sn? } - enqueue a
+         date range for reprocessing and optionally pull a device's ATTLOG.
+       - GET  /api/attendance/reprocess-queue - inspect the pending backlog.
+       - File: python_server/routes/api.py.
+
+    h) MANUAL-EDIT PROTECTION
+       - New column 'locked' on attendance_daily. The reprocessor SKIPS locked rows so a
+         hand-corrected day is never overwritten by automatic reprocessing.
+       - File: python_server/workers/attendance_processor.py.
+
+28. EMPLOYEE REPORT - GAPS NO LONGER HIDDEN
+    - The report now renders EVERY calendar day in the range (not just rows that exist).
+      A working day with no processed row shows as "Pending / No data" instead of
+      silently disappearing; off days with no row are labelled from the holiday table /
+      weekly-off setting.
+    - "Total Work Days" = Present + Absent only (pending days are NOT counted as absent).
+    - New summary lines: "Holiday/Weekend Duty" (sub-count of Present) and
+      "Days Pending / No Data", plus a warning note when pending days exist.
+    - "Pending / No Data" filter checkbox added; defunct "Total Hours" checkbox/row and
+      the detail "Hours" column removed (work-hours intentionally not tracked).
+    - File: php_dashboard/pages/reports/employee.php.
+
+29. DASHBOARD CONSUMERS UPDATED FOR 'pending' / DUTY
+    - Daily Attendance: new "Pending / No Data" stat card, status filter option, status
+      badge, and a "Holiday/Weekend duty" flag in the table.
+    - Custom Report: added optional "Holiday/Weekend Duty" and "Pending/No Data" columns
+      (summary + CSV export). work_days remains Present + Absent.
+    - Files: php_dashboard/pages/attendance/daily.php,
+             php_dashboard/pages/reports/custom.php.
+
+30. DATABASE SCHEMA + MIGRATION
+    - schema.sql: attendance_daily gains status 'pending', day_type, worked_on_off_day,
+      is_pending, locked (+ idx_status); new table attendance_reprocess_queue.
+    - Migration for existing databases: database/migrations/001_missed_data_recovery.sql
+      (run once:  mysql -u root attendance_system < database/migrations/001_missed_data_recovery.sql)
+    - Note: the attendance processor now runs every 2 minutes (was 5).

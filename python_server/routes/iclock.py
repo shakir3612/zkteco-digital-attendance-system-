@@ -26,6 +26,7 @@ from services.device import (
 )
 from services.attendance import process_attlog_body
 from services.notification import notify_new_device
+from services.reprocess import enqueue_dates
 
 logger = logging.getLogger(__name__)
 
@@ -182,15 +183,24 @@ async def receive_device_data(
 
 async def _handle_attlog(device_sn: str, ip_address: str, body: str, stamp: str):
     """Process incoming attendance logs."""
-    inserted, skipped = await process_attlog_body(device_sn, body)
+    inserted, skipped, affected_dates = await process_attlog_body(device_sn, body)
 
-    # Update stamp
+    # Update stamp.
+    # IMPORTANT: store the stamp the device sent us VERBATIM (this is the device's
+    # own sync cursor). Synthesising "old + inserted" desynchronises the cursor and
+    # can make the device skip or re-send records on reconnect - which is exactly
+    # what breaks backfill after an outage.
     if stamp:
-        new_stamp = str(int(stamp) + inserted) if stamp.isdigit() else stamp
-        await update_device_stamp(device_sn, "ATTLOG", new_stamp)
+        await update_device_stamp(device_sn, "ATTLOG", stamp)
+
+    # Enqueue every date that received NEW punches so the processor rebuilds it.
+    # This is what lets days that arrive late (device was offline) self-heal.
+    if affected_dates:
+        await enqueue_dates(affected_dates, reason="attlog_push")
 
     await log_connection(device_sn, ip_address, "push_att", True,
-                        f"Records: {inserted} inserted, {skipped} skipped")
+                        f"Records: {inserted} inserted, {skipped} skipped, "
+                        f"{len(affected_dates)} date(s) queued")
 
     return PlainTextResponse(content="OK")
 
@@ -262,10 +272,9 @@ async def _handle_biodata(device_sn: str, ip_address: str, body: str, stamp: str
         except Exception as e:
             logger.error(f"Error triggering sync for PIN={tpl['pin']}: {e}")
 
-    # Update stamp
+    # Update stamp - store the device-provided cursor verbatim (see _handle_attlog).
     if stamp:
-        new_stamp = str(int(stamp) + stored_count) if stamp.isdigit() else stamp
-        await update_device_stamp(device_sn, "BIODATA", new_stamp)
+        await update_device_stamp(device_sn, "BIODATA", stamp)
 
     await log_connection(device_sn, ip_address, "push_bio", True,
                         f"Stored {stored_count} templates, sync triggered")
