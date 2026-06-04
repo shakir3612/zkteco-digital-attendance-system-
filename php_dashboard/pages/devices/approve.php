@@ -50,6 +50,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         auditLog('device_approved', 'device', $device['id'], "Approved device SN={$sn}");
 
+        // Trigger full sync via Python API: push all existing employees + bio to device
+        require_once __DIR__ . '/../../api/internal.php';
+        $syncResult = apiResyncAll($sn);
+        $syncMsg = '';
+        if (!empty($syncResult['success'])) {
+            $syncMsg = " Queued {$syncResult['users_queued']} users + {$syncResult['bio_queued']} bio templates for sync.";
+        } else {
+            // Python server may not be running yet; log and continue gracefully
+            $syncMsg = " (Note: Python server unreachable — run resync manually once server is up.)";
+        }
+
         // Queue import commands if requested
         if ($importUsers) {
             $stmt = $db->prepare("
@@ -79,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$sn, $_SESSION['user_id']]);
         }
 
-        $message = "Device approved successfully!" . ($importUsers ? " User import queued." : "") . ($importBio ? " Biometric import queued." : "");
+        $message = "Device approved successfully!{$syncMsg}" . ($importUsers ? " User import queued." : "") . ($importBio ? " Biometric import queued." : "");
         $messageType = 'success';
 
         // Refresh device data

@@ -332,3 +332,51 @@ Changes made - Session 6 (2026-05-31)
         * routes/iclock.py: uses MAX_PUSH_BYTES; alerts admins on oversize.
     - Files: python_server/config.py, python_server/services/notification.py,
              python_server/routes/iclock.py
+
+
+=================================================
+Changes made - Session 7 (2026-06-03) [New PC Setup]
+=================================================
+
+32. FIX: FULL SYNC NOT TRIGGERED ON DEVICE APPROVAL
+    Problem: when a device was approved for the first time (or re-approved after
+    suspension/rejection), the approval page only updated the device status in the
+    DB. It never pushed existing employees or biometric templates to the newly
+    approved device. The device had to wait for someone to click "Re-sync All Bio"
+    manually, or for a new bio enrollment to arrive from another device.
+
+    Fix: approve.php now calls apiResyncAll() immediately after setting
+    status='approved'. This hits POST /api/device/resync-all on the Python server,
+    which queues SET_USER commands for all active employees (priority 3) and
+    SET_BIODATA commands for all stored biometric templates (priority 4).
+    Commands are delivered gradually as the device polls GET /iclock/getrequest.
+
+    Gracefully handles the Python server being offline at approval time — shows
+    a warning note in the success message instead of throwing an error.
+
+    File: php_dashboard/pages/devices/approve.php
+
+33. ADD: PYTHON SERVER ENVIRONMENT CONFIG FILE
+    Added python_server/.env — the config file that config.py was already loading
+    via python-dotenv (load_dotenv()) but was missing from the repo, forcing manual
+    edits to config.py on every new deployment.
+
+    Defaults match a fresh XAMPP install:
+      DB_HOST=127.0.0.1, DB_PORT=3306, DB_USER=root, DB_PASSWORD=(empty),
+      DB_NAME=attendance_system, SERVER_HOST=0.0.0.0, SERVER_PORT=8015,
+      SERVER_TIMEZONE=Asia/Dhaka
+
+    To customise (e.g. set a MySQL root password), edit this file — no need to
+    touch config.py. The file is already listed in python_server/.gitignore so
+    local credentials are never committed.
+
+    File: python_server/.env (new)
+
+34. UPDATE: SETUP DOCUMENTATION
+    - Step 2 now says "edit .env" instead of "edit config.py" (matches change #33)
+    - Workers table corrected: 4 workers listed (time_sync_cron was missing)
+    - Removed the now-incorrect Windows Task Scheduler note for time sync —
+      time_sync_cron.py runs as an automatic background worker inside the server
+      process since Session 2 (change #9); no scheduler setup is needed
+
+    File: docs/setup.md

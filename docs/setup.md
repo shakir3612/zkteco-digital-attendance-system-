@@ -50,13 +50,11 @@
    pip install -r requirements.txt
    ```
 
-4. Edit `config.py` if needed (defaults work for standard XAMPP):
-   - `DB_HOST` = 127.0.0.1
-   - `DB_PORT` = 3306
-   - `DB_USER` = root
-   - `DB_PASSWORD` = "" (empty for default XAMPP)
-   - `DB_NAME` = attendance_system
-   - `SERVER_PORT` = 8015
+4. Configure via `.env` file (already present in `python_server/`):
+   - Open `python_server/.env` in any text editor
+   - Defaults work for a fresh XAMPP install (blank password, port 3306)
+   - Change `DB_PASSWORD` if your MySQL has a root password
+   - Change `SERVER_PORT` only if 8015 is taken
 
 5. Start the server:
    ```cmd
@@ -110,21 +108,15 @@ The Python server runs these background workers automatically on startup:
 | Worker | Interval | Purpose |
 |---|---|---|
 | Sync Worker | Every 5 seconds | Distributes biometric templates to devices |
-| Device Monitor | Every 60 seconds | Detects offline devices, creates notifications |
-| Attendance Processor | Every 5 minutes | Pairs raw punches into daily records (late/early/absent) |
+| Device Monitor | Every 60 seconds | Detects offline devices, creates notifications, auto-backfill on reconnect |
+| Attendance Processor | Every 2 minutes | Pairs raw punches into daily records (late/early/absent), drains dirty-date queue |
+| Time Sync Cron | Every 60 seconds (fires at set hour) | Daily SET_TIME command to all approved devices (default 3:00 AM) |
 
-**No Task Scheduler needed for attendance processing** — it happens automatically while the server is running.
+**No Task Scheduler needed for attendance processing or time sync** — both run automatically as background workers while the server is running.
 
-### Optional: Daily Time Sync (Windows Task Scheduler)
+### Time Sync Details
 
-If you want to force-sync device clocks daily at 3:00 AM:
-```cmd
-Task: ZKTeco Time Sync
-Program: C:\path\to\venv\Scripts\python.exe
-Arguments: -m workers.time_sync_cron
-Start in: C:\path\to\attendance_system\python_server
-Trigger: Daily at 03:00
-```
+The `time_sync_cron` worker runs every minute, checks the configured `time_sync_hour` setting (default: 3 AM), and queues `SET_TIME` to all approved devices at that hour automatically. No Windows Task Scheduler setup needed.
 
 ---
 
