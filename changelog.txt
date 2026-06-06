@@ -380,3 +380,24 @@ Changes made - Session 7 (2026-06-03) [New PC Setup]
       process since Session 2 (change #9); no scheduler setup is needed
 
     File: docs/setup.md
+=================================================
+Changes made - Session 8 (2026-06-06)
+=================================================
+
+34. DAILY ATTENDANCE PDF EXPORT
+    - Added "Export PDF" button to Daily Attendance page (filter bar)
+    - Opens PDF in new tab with print-friendly layout
+    - PDF includes: Company logo/name header, date, generation timestamp
+    - Summary section: Present, Absent, On Leave, Holiday, Weekend, Late,
+      Early Leave, Off-Day Duty counts
+    - Detail table: PIN, Name, Grade, Shift, In, Out, Hours, Status, Flags
+    - Color-coded status badges (green=present, red=absent, etc.)
+    - Flags displayed: Late minutes, Early minutes, Single punch, Off-day duty
+    - Uses browser print (Ctrl+P > Save as PDF) — no external dependencies
+    - Files: php_dashboard/pages/attendance/generate_daily_pdf.php (new),
+             php_dashboard/pages/attendance/daily.php (button added)
+
+35. LEAVE SUMMARY DROPDOWN (attempted fix reverted)
+    - Attempted to increase vertical size of "Select Employee" dropdown in Leave Summary
+    - Reverted as the fix was not working properly
+    - File: php_dashboard/pages/leaves/list.php

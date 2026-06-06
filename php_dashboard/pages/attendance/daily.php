@@ -192,6 +192,7 @@ $processedCount = $stmt2->fetch()['cnt'];
             <a href="?date=<?= date('Y-m-d', strtotime($selectedDate . ' -1 day')) ?>" class="btn btn-outline btn-sm">&larr; Prev</a>
             <a href="?date=<?= date('Y-m-d', strtotime($selectedDate . ' +1 day')) ?>" class="btn btn-outline btn-sm">Next &rarr;</a>
             <a href="?date=<?= date('Y-m-d') ?>" class="btn btn-outline btn-sm">Today</a>
+            <a href="generate_daily_pdf.php?date=<?= htmlspecialchars($selectedDate) ?>" target="_blank" class="btn btn-success btn-sm">📄 Export PDF</a>
         </form>
     </div>
 </div>
